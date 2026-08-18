@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { TimecodeRange } from "./Timecode";
+import { TimecodeRange, ViralityBadge } from "./Timecode";
 
 type ProjectMoment = {
   start: number;
@@ -10,6 +10,7 @@ type ProjectMoment = {
   reason: string;
   description: string;
   hashtags: string[];
+  viralityScore: number;
   clipFile: string;
 };
 type Project = {
@@ -151,7 +152,12 @@ export function ProjectsTab() {
                   className="aspect-[9/16] w-full max-w-[220px] self-center rounded-md border border-border bg-background object-cover"
                 />
                 <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-sm font-medium text-foreground">{moment.title}</span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="text-sm font-medium text-foreground">{moment.title}</span>
+                    {typeof moment.viralityScore === "number" && (
+                      <ViralityBadge score={moment.viralityScore} />
+                    )}
+                  </span>
                   <TimecodeRange start={moment.start} end={moment.end} />
                 </div>
                 <p className="text-xs text-muted">{moment.reason}</p>

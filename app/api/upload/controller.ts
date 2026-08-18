@@ -15,4 +15,9 @@ export class UploadController {
 
     return success(result);
   };
+
+  public handleDelete = async (id: string): Promise<Result<{ ok: true }>> => {
+    await this.service.deleteUpload(id);
+    return success({ ok: true });
+  };
 }

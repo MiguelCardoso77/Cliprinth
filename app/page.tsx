@@ -10,10 +10,10 @@ export default function Home() {
   const [tab, setTab] = useState<Tab>("new");
 
   return (
-    <div className="flex min-h-screen font-sans">
+    <div className="flex h-screen overflow-hidden font-sans">
       <Sidebar tab={tab} onChange={setTab} />
-      <main className="flex-1 px-8 py-8">
-        <div className="mx-auto w-full max-w-3xl">
+      <main className="flex-1 overflow-y-auto px-8 py-10 sm:px-12">
+        <div className="mx-auto w-full max-w-[1080px]">
           {tab === "new" && <NewTab />}
           {tab === "projects" && <ProjectsTab />}
           {tab === "storage" && <StorageTab />}

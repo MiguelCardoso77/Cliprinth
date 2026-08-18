@@ -102,7 +102,8 @@ function parseCreateBody(
       typeof m.reason === "string" &&
       typeof m.description === "string" &&
       Array.isArray(m.hashtags) &&
-      m.hashtags.every((tag) => typeof tag === "string")
+      m.hashtags.every((tag) => typeof tag === "string") &&
+      typeof m.viralityScore === "number"
     );
   });
 

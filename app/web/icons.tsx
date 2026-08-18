@@ -16,6 +16,30 @@ function Icon({ path, className }: { path: string; className?: string }) {
   );
 }
 
+// Lucide-style stroke icons: 24x24 viewBox, no fill, 1.8 stroke weight.
+function StrokeIcon({
+  className,
+  children,
+}: {
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      {children}
+    </svg>
+  );
+}
+
 export function IconAdd({ className }: IconProps) {
   return (
     <Icon
@@ -40,6 +64,40 @@ export function IconFolder({ className }: IconProps) {
       className={className}
       path="M140-160q-24 0-42-18.5T80-220v-520q0-23 18-41.5t42-18.5h281l60 60h339q23 0 41.5 18.5T880-680v460q0 23-18.5 41.5T820-160H140Zm0-60h680v-460H456l-60-60H140v520Zm0 0v-520 520Z"
     />
+  );
+}
+
+export function IconUpload({ className }: IconProps) {
+  return (
+    <StrokeIcon className={className}>
+      <path d="M12 16V4M7 9l5-5 5 5" />
+      <path d="M4 16v2.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V16" />
+    </StrokeIcon>
+  );
+}
+
+export function IconPlay({ className }: IconProps) {
+  return (
+    <StrokeIcon className={className}>
+      <path d="M7 4.5v15l13-7.5-13-7.5Z" strokeLinejoin="round" />
+    </StrokeIcon>
+  );
+}
+
+export function IconCopy({ className }: IconProps) {
+  return (
+    <StrokeIcon className={className}>
+      <rect x="9" y="9" width="11" height="11" rx="1.8" />
+      <path d="M6 15H5.5A1.5 1.5 0 0 1 4 13.5v-8A1.5 1.5 0 0 1 5.5 4h8A1.5 1.5 0 0 1 15 5.5V6" />
+    </StrokeIcon>
+  );
+}
+
+export function IconTrash({ className }: IconProps) {
+  return (
+    <StrokeIcon className={className}>
+      <path d="M4.5 7h15M9.5 7V5a1.5 1.5 0 0 1 1.5-1.5h2A1.5 1.5 0 0 1 14.5 5v2M18 7l-.7 11.5A1.5 1.5 0 0 1 15.8 20H8.2a1.5 1.5 0 0 1-1.5-1.5L6 7" />
+    </StrokeIcon>
   );
 }
 

@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
-import { UPLOAD_DIR } from "@/lib/storage";
+import { deleteUpload, UPLOAD_DIR } from "@/lib/storage";
 
 export type UploadResult = { id: string; filename: string };
 
@@ -17,5 +17,9 @@ export class UploadService {
     await writeFile(filePath, buffer);
 
     return { id, filename: file.name };
+  };
+
+  public deleteUpload = async (id: string): Promise<void> => {
+    await deleteUpload(id);
   };
 }

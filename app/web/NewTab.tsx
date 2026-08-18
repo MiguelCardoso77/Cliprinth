@@ -3,10 +3,11 @@
 import { useState } from "react";
 import { buildMomentsPrompt, buildTimestampedTranscript } from "@/lib/moments";
 import { CAPTION_PRESETS, CaptionPresetId, DEFAULT_CAPTION_PRESET } from "@/lib/ass";
-import { TimecodeRange } from "./Timecode";
+import { TimecodeRange, ViralityBadge } from "./Timecode";
 import { TrimEditor } from "./TrimEditor";
 
 type Word = { word: string; start: number; end: number };
+type UploadEntry = { id: string; filename: string; path: string };
 type Moment = {
   start: number;
   end: number;
@@ -14,6 +15,7 @@ type Moment = {
   reason: string;
   description: string;
   hashtags: string[];
+  viralityScore: number;
 };
 type ProjectMoment = Moment & { clipFile: string };
 type Project = { id: string; uploadId: string; createdAt: string; moments: ProjectMoment[] };
@@ -98,8 +100,22 @@ export function NewTab() {
   const [projectError, setProjectError] = useState<string | null>(null);
   const [isCuttingClips, setIsCuttingClips] = useState(false);
   const [captionPreset, setCaptionPreset] = useState<CaptionPresetId>(DEFAULT_CAPTION_PRESET);
-  const [uploadMode, setUploadMode] = useState<"file" | "youtube">("file");
+  const [uploadMode, setUploadMode] = useState<"file" | "youtube" | "storage">("file");
   const [youtubeUrl, setYoutubeUrl] = useState("");
+  const [existingUploads, setExistingUploads] = useState<UploadEntry[] | null>(null);
+  const [existingUploadsError, setExistingUploadsError] = useState<string | null>(null);
+  const [selectedUploadId, setSelectedUploadId] = useState<string | null>(null);
+
+  function handleUploadModeChange(mode: "file" | "youtube" | "storage") {
+    setUploadMode(mode);
+
+    if (mode === "storage" && existingUploads === null) {
+      fetch("/api/uploads")
+        .then((response) => response.json())
+        .then((data) => setExistingUploads(data))
+        .catch((err) => setExistingUploadsError((err as Error).message));
+    }
+  }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -144,6 +160,16 @@ export function NewTab() {
       }
 
       uploadResult = result;
+    } else if (uploadMode === "storage") {
+      const entry = existingUploads?.find((upload) => upload.id === selectedUploadId);
+
+      if (!entry) {
+        setStatus("Pick a video from storage first.");
+        return;
+      }
+
+      setIsBusy(true);
+      uploadResult = entry;
     } else {
       if (!youtubeUrl.trim()) {
         setStatus("Paste a YouTube URL first.");
@@ -327,7 +353,7 @@ export function NewTab() {
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={() => setUploadMode("file")}
+            onClick={() => handleUploadModeChange("file")}
             className={`rounded-md border px-3 py-1 text-xs transition-colors ${
               uploadMode === "file"
                 ? "border-accent bg-accent/10 text-foreground"
@@ -338,7 +364,7 @@ export function NewTab() {
           </button>
           <button
             type="button"
-            onClick={() => setUploadMode("youtube")}
+            onClick={() => handleUploadModeChange("youtube")}
             className={`rounded-md border px-3 py-1 text-xs transition-colors ${
               uploadMode === "youtube"
                 ? "border-accent bg-accent/10 text-foreground"
@@ -346,6 +372,17 @@ export function NewTab() {
             }`}
           >
             YouTube link
+          </button>
+          <button
+            type="button"
+            onClick={() => handleUploadModeChange("storage")}
+            className={`rounded-md border px-3 py-1 text-xs transition-colors ${
+              uploadMode === "storage"
+                ? "border-accent bg-accent/10 text-foreground"
+                : "border-border text-muted hover:bg-surface-hover"
+            }`}
+          >
+            From storage
           </button>
         </div>
         <form onSubmit={handleSubmit} className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
@@ -357,7 +394,7 @@ export function NewTab() {
               accept="video/*"
               className="font-mono text-xs text-muted file:mr-3 file:rounded-md file:border-0 file:bg-accent file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-background file:cursor-pointer cursor-pointer"
             />
-          ) : (
+          ) : uploadMode === "youtube" ? (
             <input
               key="youtube-input"
               type="url"
@@ -366,13 +403,59 @@ export function NewTab() {
               placeholder="https://www.youtube.com/watch?v=..."
               className="rounded-md border border-border bg-background px-3 py-2 font-mono text-xs text-foreground placeholder:text-muted"
             />
+          ) : existingUploadsError ? (
+            <p className="font-mono text-xs text-rec">Failed to load storage: {existingUploadsError}</p>
+          ) : existingUploads === null ? (
+            <p className="font-mono text-xs text-muted">Loading storage...</p>
+          ) : existingUploads.length === 0 ? (
+            <p className="font-mono text-xs text-muted">
+              No videos in storage yet. Upload a file or a YouTube link first.
+            </p>
+          ) : (
+            <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {existingUploads.map((entry) => {
+                const isSelected = selectedUploadId === entry.id;
+
+                return (
+                  <li key={entry.id}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedUploadId(entry.id)}
+                      className={`flex w-full flex-col gap-2 rounded-md border p-2 text-left transition-colors ${
+                        isSelected
+                          ? "border-accent bg-accent/10"
+                          : "border-border hover:bg-surface-hover"
+                      }`}
+                    >
+                      <video
+                        preload="metadata"
+                        src={`/api/upload/${entry.id}/file`}
+                        className="aspect-video w-full rounded border border-border bg-background object-cover"
+                      />
+                      <span
+                        className="truncate font-mono text-xs text-foreground"
+                        title={entry.filename}
+                      >
+                        {entry.filename}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
           )}
           <button
             type="submit"
             disabled={isBusy}
             className="self-start rounded-md bg-accent px-4 py-2 text-sm font-semibold text-background transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isBusy ? "Processing..." : uploadMode === "file" ? "Upload and transcribe" : "Download and transcribe"}
+            {isBusy
+              ? "Processing..."
+              : uploadMode === "file"
+                ? "Upload and transcribe"
+                : uploadMode === "youtube"
+                  ? "Download and transcribe"
+                  : "Use this video and transcribe"}
           </button>
         </form>
         {status && <StatusLine busy={isBusy || isCuttingClips} text={status} />}
@@ -497,7 +580,12 @@ export function NewTab() {
               return (
                 <li key={index} className="rounded-lg border border-border bg-surface p-4">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span className="font-medium text-foreground">{moment.title}</span>
+                    <span className="flex items-center gap-2">
+                      <span className="font-medium text-foreground">{moment.title}</span>
+                      {typeof moment.viralityScore === "number" && (
+                        <ViralityBadge score={moment.viralityScore} />
+                      )}
+                    </span>
                     <TimecodeRange start={moment.start} end={moment.end} />
                   </div>
                   <p className="mt-1 text-sm text-muted">{moment.reason}</p>

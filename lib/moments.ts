@@ -14,8 +14,9 @@ export const MOMENT_SCHEMA = {
           reason: { type: "string" },
           description: { type: "string" },
           hashtags: { type: "array", items: { type: "string" } },
+          viralityScore: { type: "number" },
         },
-        required: ["start", "end", "title", "reason", "description", "hashtags"],
+        required: ["start", "end", "title", "reason", "description", "hashtags", "viralityScore"],
         additionalProperties: false,
       },
     },
@@ -57,15 +58,16 @@ export function buildMomentsPrompt(transcript: string): string {
 
 The transcript below is grouped into ~15 second segments with start/end timestamps in seconds.
 
-Identify up to 8 of the strongest standalone moments (self-contained stories, strong hooks, surprising claims, emotional peaks, or clear payoffs). For each moment, return:
-- start / end: timestamps in seconds, aligned to the segment boundaries
+Identify up to 10 of the strongest standalone moments (self-contained stories, strong hooks, surprising claims, emotional peaks, or clear payoffs). Each moment must be between 0 and 60 seconds long (end - start <= 60). For each moment, return:
+- start / end: timestamps in seconds, aligned to the segment boundaries, no more than 60 seconds apart
 - title: a short, punchy title for the clip (works as both an internal label and a social media post title)
 - reason: a one-sentence reason this moment could work as a clip
 - description: a ready-to-post social media caption/description for the clip (1-3 sentences, written for the platform, no timestamps)
 - hashtags: 3-6 relevant hashtags as an array of strings, each starting with "#", no spaces
+- viralityScore: your honest estimate, from 0 to 100, of how likely this specific clip is to go viral on short-form platforms (0 = very unlikely, 100 = extremely likely)
 
 Respond with ONLY a JSON object matching this exact shape, no other text:
-{"moments": [{"start": number, "end": number, "title": string, "reason": string, "description": string, "hashtags": string[]}]}
+{"moments": [{"start": number, "end": number, "title": string, "reason": string, "description": string, "hashtags": string[], "viralityScore": number}]}
 
 Transcript:
 ${transcript}`;

@@ -1,4 +1,4 @@
-import { readdir, readFile, writeFile } from "fs/promises";
+import { readdir, readFile, rm, stat, writeFile } from "fs/promises";
 import path from "path";
 
 export const UPLOAD_DIR = path.join(process.cwd(), "storage", "uploads");
@@ -15,7 +15,7 @@ export async function findUploadedFile(id: string): Promise<string> {
   return path.join(jobDir, files[0]);
 }
 
-export type UploadEntry = { id: string; filename: string; path: string };
+export type UploadEntry = { id: string; filename: string; path: string; createdAt: string };
 
 export async function listUploads(): Promise<UploadEntry[]> {
   const ids = await readdir(UPLOAD_DIR).catch(() => []);
@@ -24,13 +24,23 @@ export async function listUploads(): Promise<UploadEntry[]> {
   for (const id of ids) {
     try {
       const filePath = await findUploadedFile(id);
-      entries.push({ id, filename: path.basename(filePath), path: filePath });
+      const stats = await stat(filePath);
+      entries.push({
+        id,
+        filename: path.basename(filePath),
+        path: filePath,
+        createdAt: stats.birthtime.toISOString(),
+      });
     } catch {
       // Skip empty or unreadable upload directories.
     }
   }
 
-  return entries;
+  return entries.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export async function deleteUpload(id: string): Promise<void> {
+  await rm(path.join(UPLOAD_DIR, id), { recursive: true, force: true });
 }
 
 // A project is a set of clips cut from a single upload in one pass, based on
@@ -43,6 +53,7 @@ export type ProjectMoment = {
   reason: string;
   description: string;
   hashtags: string[];
+  viralityScore: number;
   clipFile: string;
 };
 

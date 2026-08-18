@@ -10,21 +10,24 @@ export function Sidebar({ tab, onChange }: { tab: Tab; onChange: (tab: Tab) => v
 
   return (
     <aside
-      className={`sticky top-0 flex h-screen shrink-0 flex-col border-r border-border bg-surface transition-[width] duration-200 ${
-        collapsed ? "w-16" : "w-56"
+      className={`sticky top-0 flex h-screen shrink-0 flex-col bg-sidebar border-r border-border transition-[width] duration-200 ${
+        collapsed ? "w-16" : "w-[262px]"
       }`}
     >
-      <div className={`flex items-center py-4 ${collapsed ? "justify-center" : "px-4"}`}>
-        {collapsed ? (
-          <span className="font-mono text-sm font-semibold text-accent">C</span>
-        ) : (
-          <span className="font-mono text-sm font-semibold tracking-tight text-foreground">
+      <div className={`flex items-center gap-2.5 py-5 ${collapsed ? "justify-center" : "px-5"}`}>
+        <span
+          className="h-[11px] w-[11px] shrink-0 rounded-[3px] bg-accent"
+          style={{ boxShadow: "0 0 10px 1px var(--accent-soft)" }}
+          aria-hidden
+        />
+        {!collapsed && (
+          <span className="font-mono text-[15px] font-semibold tracking-[1.5px] text-foreground">
             CLIPRINTH
           </span>
         )}
       </div>
 
-      <nav className="flex flex-1 flex-col gap-1 px-2">
+      <nav className="flex flex-1 flex-col gap-1 px-3">
         <NavItem
           icon={<IconAdd className="h-5 w-5" />}
           label="New"
@@ -52,12 +55,12 @@ export function Sidebar({ tab, onChange }: { tab: Tab; onChange: (tab: Tab) => v
         type="button"
         onClick={() => setCollapsed((current) => !current)}
         title={collapsed ? "Expand menu" : "Collapse menu"}
-        className={`flex items-center gap-2 border-t border-border py-3 text-muted transition-colors hover:text-foreground ${
-          collapsed ? "justify-center" : "px-4"
+        className={`mt-auto flex items-center gap-2 border-t border-border py-3.5 font-mono text-xs text-muted transition-colors hover:text-foreground ${
+          collapsed ? "justify-center" : "px-5"
         }`}
       >
         {collapsed ? <IconDockToLeft className="h-5 w-5" /> : <IconDockToRight className="h-5 w-5" />}
-        {!collapsed && <span className="text-xs">Collapse</span>}
+        {!collapsed && <span>Collapse</span>}
       </button>
     </aside>
   );
@@ -81,13 +84,18 @@ function NavItem({
       type="button"
       onClick={onClick}
       title={collapsed ? label : undefined}
-      className={`flex items-center gap-3 rounded-md py-2 text-sm font-medium transition-colors ${
-        collapsed ? "justify-center" : "px-3"
+      className={`flex items-center gap-3 rounded-[10px] py-2.5 font-mono text-[13px] font-medium transition-colors ${
+        collapsed ? "justify-center" : "px-3.5"
       } ${
         active
-          ? "bg-accent text-background"
-          : "text-muted hover:bg-surface-hover hover:text-foreground"
+          ? "text-white shadow-[0_2px_10px_-2px_var(--accent-soft)]"
+          : "text-[#9aa0a8] hover:bg-white/[0.04] hover:text-foreground"
       }`}
+      style={
+        active
+          ? { background: "linear-gradient(180deg, var(--accent), var(--accent-active))" }
+          : undefined
+      }
     >
       <span className="shrink-0">{icon}</span>
       {!collapsed && <span>{label}</span>}

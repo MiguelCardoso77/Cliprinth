@@ -23,6 +23,7 @@ export type MomentInput = {
   reason: string;
   description: string;
   hashtags: string[];
+  viralityScore: number;
 };
 export type CreateProjectResult = { projectId: string };
 

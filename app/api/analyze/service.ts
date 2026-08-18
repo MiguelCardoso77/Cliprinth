@@ -9,6 +9,7 @@ export type Moment = {
   reason: string;
   description: string;
   hashtags: string[];
+  viralityScore: number;
 };
 
 export class AnalyzeService {
