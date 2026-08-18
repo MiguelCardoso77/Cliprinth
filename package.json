@@ -1,6 +1,6 @@
 {
   "name": "cliprinth",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": true,
   "scripts": {
     "build": "next build",
@@ -8,7 +8,7 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.117.1",
+    "@anthropic-ai/sdk": "0.117.1",
     "dotenv": "17.4.2",
     "next": "16.3.1",
     "nodejs-whisper": "0.3.1",

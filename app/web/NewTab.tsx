@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { buildMomentsPrompt, buildTimestampedTranscript } from "@/lib/moments";
+import { CAPTION_PRESETS, CaptionPresetId, DEFAULT_CAPTION_PRESET } from "@/lib/ass";
 import { TimecodeRange } from "./Timecode";
+import { TrimEditor } from "./TrimEditor";
 
 type Word = { word: string; start: number; end: number };
 type Moment = {
@@ -35,6 +37,27 @@ async function pollTranscription(jobId: string): Promise<Word[]> {
 
     if (job.status === "error") {
       throw new Error(job.error ?? "Transcription failed");
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+}
+
+async function pollYoutubeDownload(jobId: string): Promise<{ id: string; filename: string }> {
+  while (true) {
+    const response = await fetch(`/api/upload/youtube/${jobId}`);
+    const job = await response.json();
+
+    if (!response.ok) {
+      throw new Error(job.error ?? "Failed to check download status");
+    }
+
+    if (job.status === "done") {
+      return job.result;
+    }
+
+    if (job.status === "error") {
+      throw new Error(job.error ?? "Download failed");
     }
 
     await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -74,6 +97,9 @@ export function NewTab() {
   const [project, setProject] = useState<Project | null>(null);
   const [projectError, setProjectError] = useState<string | null>(null);
   const [isCuttingClips, setIsCuttingClips] = useState(false);
+  const [captionPreset, setCaptionPreset] = useState<CaptionPresetId>(DEFAULT_CAPTION_PRESET);
+  const [uploadMode, setUploadMode] = useState<"file" | "youtube">("file");
+  const [youtubeUrl, setYoutubeUrl] = useState("");
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -86,33 +112,68 @@ export function NewTab() {
     setProject(null);
     setProjectError(null);
 
-    const form = event.currentTarget;
-    const fileInput = form.elements.namedItem("file") as HTMLInputElement;
-    const file = fileInput.files?.[0];
+    let uploadResult: { id: string; filename: string };
 
-    if (!file) {
-      setStatus("Choose a file first.");
-      return;
-    }
+    if (uploadMode === "file") {
+      const form = event.currentTarget;
+      const fileInput = form.elements.namedItem("file") as HTMLInputElement;
+      const file = fileInput.files?.[0];
 
-    setIsBusy(true);
+      if (!file) {
+        setStatus("Choose a file first.");
+        return;
+      }
 
-    const formData = new FormData();
-    formData.append("file", file);
+      setIsBusy(true);
+      setStatus("Uploading video...");
 
-    setStatus("Uploading video...");
+      const formData = new FormData();
+      formData.append("file", file);
 
-    const uploadResponse = await fetch("/api/upload", {
-      method: "POST",
-      body: formData,
-    });
+      const uploadResponse = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
 
-    const uploadResult = await uploadResponse.json();
+      const result = await uploadResponse.json();
 
-    if (!uploadResponse.ok) {
-      setStatus(`Upload failed: ${uploadResult.error}`);
-      setIsBusy(false);
-      return;
+      if (!uploadResponse.ok) {
+        setStatus(`Upload failed: ${result.error}`);
+        setIsBusy(false);
+        return;
+      }
+
+      uploadResult = result;
+    } else {
+      if (!youtubeUrl.trim()) {
+        setStatus("Paste a YouTube URL first.");
+        return;
+      }
+
+      setIsBusy(true);
+      setStatus("Downloading video from YouTube...");
+
+      const startResponse = await fetch("/api/upload/youtube", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: youtubeUrl.trim() }),
+      });
+
+      const startResult = await startResponse.json();
+
+      if (!startResponse.ok) {
+        setStatus(`Download failed: ${startResult.error}`);
+        setIsBusy(false);
+        return;
+      }
+
+      try {
+        uploadResult = await pollYoutubeDownload(startResult.jobId);
+      } catch (error) {
+        setStatus(`Download failed: ${(error as Error).message}`);
+        setIsBusy(false);
+        return;
+      }
     }
 
     setUploadId(uploadResult.id);
@@ -170,8 +231,9 @@ export function NewTab() {
       }
 
       setMoments(analyzeResult.moments);
-      setStatus(`Analysis complete. ${analyzeResult.moments.length} suggested moments.`);
-      await createProject(uploadResult.id, analyzeResult.moments, words);
+      setStatus(
+        `Analysis complete. ${analyzeResult.moments.length} suggested moments. Pick a caption style below and cut the clips.`
+      );
     } catch (error) {
       setStatus(`Transcription complete, but analysis failed: ${(error as Error).message}`);
     } finally {
@@ -202,11 +264,9 @@ export function NewTab() {
     }
 
     setMoments(parsedMoments);
-    setStatus(`${parsedMoments.length} moments loaded from the pasted response.`);
-
-    if (uploadId && transcript) {
-      await createProject(uploadId, parsedMoments, transcript);
-    }
+    setStatus(
+      `${parsedMoments.length} moments loaded from the pasted response. Pick a caption style below and cut the clips.`
+    );
   }
 
   async function createProject(forUploadId: string, momentsToCut: Moment[], words: Word[]) {
@@ -219,7 +279,7 @@ export function NewTab() {
       const createResponse = await fetch("/api/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uploadId: forUploadId, moments: momentsToCut, words }),
+        body: JSON.stringify({ uploadId: forUploadId, moments: momentsToCut, words, captionPreset }),
       });
 
       const createResult = await createResponse.json();
@@ -247,23 +307,72 @@ export function NewTab() {
     }
   }
 
+  async function handleCutClips() {
+    if (!uploadId || !transcript || !moments) return;
+    await createProject(uploadId, moments, transcript);
+  }
+
+  function handleTrimChange(index: number, next: { start: number; end: number }) {
+    setMoments((current) =>
+      current
+        ? current.map((moment, i) => (i === index ? { ...moment, ...next } : moment))
+        : current
+    );
+  }
+
   return (
     <div className="flex flex-col gap-8">
       <section className="flex flex-col gap-3">
         <SectionLabel index="01" title="Upload video" />
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setUploadMode("file")}
+            className={`rounded-md border px-3 py-1 text-xs transition-colors ${
+              uploadMode === "file"
+                ? "border-accent bg-accent/10 text-foreground"
+                : "border-border text-muted hover:bg-surface-hover"
+            }`}
+          >
+            File
+          </button>
+          <button
+            type="button"
+            onClick={() => setUploadMode("youtube")}
+            className={`rounded-md border px-3 py-1 text-xs transition-colors ${
+              uploadMode === "youtube"
+                ? "border-accent bg-accent/10 text-foreground"
+                : "border-border text-muted hover:bg-surface-hover"
+            }`}
+          >
+            YouTube link
+          </button>
+        </div>
         <form onSubmit={handleSubmit} className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
-          <input
-            type="file"
-            name="file"
-            accept="video/*"
-            className="font-mono text-xs text-muted file:mr-3 file:rounded-md file:border-0 file:bg-accent file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-background file:cursor-pointer cursor-pointer"
-          />
+          {uploadMode === "file" ? (
+            <input
+              key="file-input"
+              type="file"
+              name="file"
+              accept="video/*"
+              className="font-mono text-xs text-muted file:mr-3 file:rounded-md file:border-0 file:bg-accent file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-background file:cursor-pointer cursor-pointer"
+            />
+          ) : (
+            <input
+              key="youtube-input"
+              type="url"
+              value={youtubeUrl}
+              onChange={(event) => setYoutubeUrl(event.target.value)}
+              placeholder="https://www.youtube.com/watch?v=..."
+              className="rounded-md border border-border bg-background px-3 py-2 font-mono text-xs text-foreground placeholder:text-muted"
+            />
+          )}
           <button
             type="submit"
             disabled={isBusy}
             className="self-start rounded-md bg-accent px-4 py-2 text-sm font-semibold text-background transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isBusy ? "Processing..." : "Upload and transcribe"}
+            {isBusy ? "Processing..." : uploadMode === "file" ? "Upload and transcribe" : "Download and transcribe"}
           </button>
         </form>
         {status && <StatusLine busy={isBusy || isCuttingClips} text={status} />}
@@ -319,9 +428,67 @@ export function NewTab() {
         </section>
       )}
 
+      {moments && moments.length > 0 && !project && uploadId && (
+        <section className="flex flex-col gap-3">
+          <SectionLabel index="04" title="Refine cut points" />
+          <p className="font-mono text-xs text-muted">
+            Nudge the in/out points so the hook lands right at the start — the AI only sees text, so
+            it can be off by a second or two.
+          </p>
+          <div className="flex flex-col gap-3">
+            {moments.map((moment, index) => (
+              <TrimEditor
+                key={index}
+                uploadId={uploadId}
+                moment={moment}
+                onChange={(next) => handleTrimChange(index, next)}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {moments && moments.length > 0 && !project && (
+        <section className="flex flex-col gap-3">
+          <SectionLabel index="05" title="Caption style" />
+          <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {(Object.keys(CAPTION_PRESETS) as CaptionPresetId[]).map((presetId) => {
+                const preset = CAPTION_PRESETS[presetId];
+                const isSelected = captionPreset === presetId;
+
+                return (
+                  <button
+                    key={presetId}
+                    type="button"
+                    onClick={() => setCaptionPreset(presetId)}
+                    className={`flex flex-col gap-1 rounded-md border p-3 text-left transition-colors ${
+                      isSelected
+                        ? "border-accent bg-accent/10"
+                        : "border-border hover:bg-surface-hover"
+                    }`}
+                  >
+                    <span className="text-sm font-medium text-foreground">{preset.label}</span>
+                    <span className="text-xs text-muted">{preset.description}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              onClick={handleCutClips}
+              disabled={isCuttingClips}
+              className="self-start rounded-md bg-accent px-4 py-2 text-sm font-semibold text-background transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isCuttingClips ? "Cutting..." : "Cut clips"}
+            </button>
+          </div>
+        </section>
+      )}
+
       {moments && moments.length > 0 && (
         <section className="flex flex-col gap-3">
-          <SectionLabel index="04" title="Suggested moments" />
+          <SectionLabel index="06" title="Suggested moments" />
           {projectError && <p className="text-xs text-rec">Failed to cut clips: {projectError}</p>}
           <ul className="flex flex-col gap-3">
             {moments.map((moment, index) => {

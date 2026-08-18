@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { mkdir, writeFile } from "fs/promises";
-import { buildAssCaptions, CaptionWord } from "@/lib/ass";
+import { buildAssCaptions, CaptionPresetId, CaptionWord, DEFAULT_CAPTION_PRESET } from "@/lib/ass";
 import { cutClip } from "@/lib/ffmpeg";
 import {
   findUploadedFile,
@@ -12,6 +12,7 @@ import {
   listProjects,
   ProjectMeta,
   ProjectMoment,
+  renameProject,
 } from "@/lib/storage";
 import { JobStore } from "../utils/jobStore";
 
@@ -28,10 +29,15 @@ export type CreateProjectResult = { projectId: string };
 export class ProjectsService {
   private jobs = new JobStore<CreateProjectResult>();
 
-  public startCreateJob = (uploadId: string, moments: MomentInput[], words: CaptionWord[]): string => {
+  public startCreateJob = (
+    uploadId: string,
+    moments: MomentInput[],
+    words: CaptionWord[],
+    captionPreset: CaptionPresetId = DEFAULT_CAPTION_PRESET
+  ): string => {
     const jobId = randomUUID();
     this.jobs.create(jobId);
-    void this.runCreateJob(jobId, uploadId, moments, words);
+    void this.runCreateJob(jobId, uploadId, moments, words, captionPreset);
     return jobId;
   };
 
@@ -47,11 +53,16 @@ export class ProjectsService {
     return getProject(projectId);
   };
 
+  public renameProject = (projectId: string, name: string): Promise<ProjectMeta | null> => {
+    return renameProject(projectId, name);
+  };
+
   private runCreateJob = async (
     jobId: string,
     uploadId: string,
     moments: MomentInput[],
-    words: CaptionWord[]
+    words: CaptionWord[],
+    captionPreset: CaptionPresetId
   ) => {
     this.jobs.update(jobId, { status: "processing" });
 
@@ -68,7 +79,7 @@ export class ProjectsService {
 
         const captionsPath = getProjectCaptionsPath(projectId, index);
         const clipWords = wordsForMoment(words, moment.start, moment.end);
-        await writeFile(captionsPath, buildAssCaptions(clipWords));
+        await writeFile(captionsPath, buildAssCaptions(clipWords, captionPreset));
 
         await cutClip(
           inputPath,

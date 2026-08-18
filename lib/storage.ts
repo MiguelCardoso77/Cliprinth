@@ -1,4 +1,4 @@
-import { readdir, readFile } from "fs/promises";
+import { readdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 
 export const UPLOAD_DIR = path.join(process.cwd(), "storage", "uploads");
@@ -51,6 +51,7 @@ export type ProjectMeta = {
   uploadId: string;
   createdAt: string;
   moments: ProjectMoment[];
+  name?: string;
 };
 
 export function getProjectDir(projectId: string): string {
@@ -76,6 +77,15 @@ export async function getProject(projectId: string): Promise<ProjectMeta | null>
   } catch {
     return null;
   }
+}
+
+export async function renameProject(projectId: string, name: string): Promise<ProjectMeta | null> {
+  const project = await getProject(projectId);
+  if (!project) return null;
+
+  const updated: ProjectMeta = { ...project, name };
+  await writeFile(getProjectMetaPath(projectId), JSON.stringify(updated, null, 2));
+  return updated;
 }
 
 export async function listProjects(): Promise<ProjectMeta[]> {

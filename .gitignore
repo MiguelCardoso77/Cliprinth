@@ -1,5 +1,7 @@
 # BUILD ARTIFACTS
 /.next
+tsconfig.tsbuildinfo
+next-env.d.ts
 
 # DEPENDENCIES
 /node_modules
