@@ -75,10 +75,7 @@ export const CAPTION_PRESETS = {
     label: "Green Pop",
     description: "Word-by-word karaoke highlight, uppercase — the Opus Clip look.",
     style: {
-      // TODO: swap for a bundled Montserrat ExtraBold once the font is
-      // vendored in-repo (see cutClip's `ass=...:fontsdir=` support) —
-      // Arial Black is the closest safe fallback available on every host.
-      fontName: "Arial Black",
+      fontName: "Montserrat ExtraBold",
       fontSize: 76,
       primaryColour: "&H00FFFFFF",
       outlineColour: "&H00000000",

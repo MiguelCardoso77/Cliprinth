@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { mkdir, writeFile } from "fs/promises";
+import path from "path";
 import {
   buildAssCaptions,
   CaptionPresetId,
@@ -116,6 +117,7 @@ export class ProjectsService {
         uploadId,
         createdAt: new Date().toISOString(),
         moments: projectMoments,
+        name: path.basename(inputPath, path.extname(inputPath)),
       };
 
       await writeFile(

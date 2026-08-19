@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   buildMomentsPrompt,
   buildTimestampedTranscript,
@@ -13,6 +13,7 @@ import {
 } from "@/lib/ass";
 import { TimecodeRange, ViralityBadge } from "./Timecode";
 import { TrimEditor } from "./TrimEditor";
+import { IconUpload, IconLink, IconBucket, IconYoutube } from "./icons";
 
 type Word = { word: string; start: number; end: number };
 type UploadEntry = { id: string; filename: string; path: string };
@@ -132,6 +133,35 @@ export function NewTab() {
     string | null
   >(null);
   const [selectedUploadId, setSelectedUploadId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(
+    null,
+  );
+  const [isFileDragOver, setIsFileDragOver] = useState(false);
+  const [isYoutubeFocused, setIsYoutubeFocused] = useState(false);
+  const canAdvance =
+    uploadMode === "file"
+      ? !!selectedFileName
+      : uploadMode === "youtube"
+        ? youtubeUrl.trim().length > 4
+        : !!selectedUploadId;
+
+  function handleFileInputChange(event: React.ChangeEvent<HTMLInputElement>) {
+    setSelectedFileName(event.target.files?.[0]?.name ?? null);
+  }
+
+  function handleFileDrop(event: React.DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    setIsFileDragOver(false);
+
+    const file = event.dataTransfer.files?.[0];
+    if (!file || !fileInputRef.current) return;
+
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(file);
+    fileInputRef.current.files = dataTransfer.files;
+    setSelectedFileName(file.name);
+  }
 
   function handleUploadModeChange(mode: "file" | "youtube" | "storage") {
     setUploadMode(mode);
@@ -409,117 +439,179 @@ export function NewTab() {
     <div className="flex flex-col gap-8">
       <section className="flex flex-col gap-3">
         <SectionLabel index="01" title="Upload video" />
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => handleUploadModeChange("file")}
-            className={`rounded-md border px-3 py-1 text-xs transition-colors ${
-              uploadMode === "file"
-                ? "border-accent bg-accent/10 text-foreground"
-                : "border-border text-muted hover:bg-surface-hover"
-            }`}
-          >
-            File
-          </button>
-          <button
-            type="button"
-            onClick={() => handleUploadModeChange("youtube")}
-            className={`rounded-md border px-3 py-1 text-xs transition-colors ${
-              uploadMode === "youtube"
-                ? "border-accent bg-accent/10 text-foreground"
-                : "border-border text-muted hover:bg-surface-hover"
-            }`}
-          >
-            YouTube link
-          </button>
-          <button
-            type="button"
-            onClick={() => handleUploadModeChange("storage")}
-            className={`rounded-md border px-3 py-1 text-xs transition-colors ${
-              uploadMode === "storage"
-                ? "border-accent bg-accent/10 text-foreground"
-                : "border-border text-muted hover:bg-surface-hover"
-            }`}
-          >
-            From storage
-          </button>
+        <div className="flex rounded-lg border border-border">
+          {(
+            [
+              { mode: "file", label: "File", Icon: IconUpload },
+              { mode: "youtube", label: "Youtube Link", Icon: IconLink },
+              { mode: "storage", label: "Storage", Icon: IconBucket },
+            ] as const
+          ).map(({ mode, label, Icon }, i) => {
+            const isSelected = uploadMode === mode;
+
+            return (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => handleUploadModeChange(mode)}
+                className={`flex flex-1 items-center justify-center gap-2 px-3 py-2 text-xs font-medium transition-colors ${
+                  i > 0 ? "border-l border-border" : ""
+                } ${
+                  isSelected
+                    ? "bg-accent/10 text-accent"
+                    : "text-muted hover:bg-surface-hover"
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                {label}
+              </button>
+            );
+          })}
         </div>
         <form
           onSubmit={handleSubmit}
           className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4"
         >
           {uploadMode === "file" ? (
-            <input
+            <label
               key="file-input"
-              type="file"
-              name="file"
-              accept="video/*"
-              className="font-mono text-xs text-muted file:mr-3 file:rounded-md file:border-0 file:bg-accent file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-background file:cursor-pointer cursor-pointer"
-            />
+              onDragOver={(event) => {
+                event.preventDefault();
+                setIsFileDragOver(true);
+              }}
+              onDragLeave={() => setIsFileDragOver(false)}
+              onDrop={handleFileDrop}
+              className="flex min-h-[160px] cursor-pointer flex-col items-center justify-center gap-3 rounded-[18px] border-[1.5px] border-dashed p-6 text-center transition-all duration-[180ms]"
+              style={{
+                borderColor: isFileDragOver
+                  ? "rgba(255, 90, 51, 0.7)"
+                  : "rgba(255, 255, 255, 0.14)",
+                background: isFileDragOver
+                  ? "rgba(255, 90, 51, 0.07)"
+                  : "var(--bg-dropzone)",
+              }}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                name="file"
+                accept="video/*"
+                onChange={handleFileInputChange}
+                className="hidden"
+              />
+              <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-soft text-accent">
+                <IconUpload className="h-6 w-6" />
+              </span>
+              <span className="text-[15px] font-medium text-foreground">
+                {isFileDragOver
+                  ? "Drop to upload"
+                  : (selectedFileName ?? "Add a video")}
+              </span>
+              {!isFileDragOver && (
+                <span className="font-mono text-[12.5px] text-muted">
+                  Drag a video here or{" "}
+                  <span className="text-accent">browse files</span>
+                </span>
+              )}
+            </label>
           ) : uploadMode === "youtube" ? (
-            <input
+            <div
               key="youtube-input"
-              type="url"
-              value={youtubeUrl}
-              onChange={(event) => setYoutubeUrl(event.target.value)}
-              placeholder="https://www.youtube.com/watch?v=..."
-              className="rounded-md border border-border bg-background px-3 py-2 font-mono text-xs text-foreground placeholder:text-muted"
-            />
-          ) : existingUploadsError ? (
-            <p className="font-mono text-xs text-rec">
-              Failed to load storage: {existingUploadsError}
-            </p>
-          ) : existingUploads === null ? (
-            <p className="font-mono text-xs text-muted">Loading storage...</p>
-          ) : existingUploads.length === 0 ? (
-            <p className="font-mono text-xs text-muted">
-              No videos in storage yet. Upload a file or a YouTube link first.
-            </p>
+              className="flex min-h-[160px] flex-col justify-center gap-2"
+            >
+              <div
+                className="flex items-center gap-3 rounded-xl px-[18px] py-[15px] transition-colors duration-150"
+                style={{
+                  background: "#0d0d0d",
+                  border: isYoutubeFocused
+                    ? "1px solid rgba(255, 90, 44, 0.5)"
+                    : "1px solid #262626",
+                }}
+              >
+                <IconYoutube className="h-[22px] w-[22px] shrink-0 text-accent" />
+                <input
+                  type="text"
+                  value={youtubeUrl}
+                  onChange={(event) => setYoutubeUrl(event.target.value)}
+                  onFocus={() => setIsYoutubeFocused(true)}
+                  onBlur={() => setIsYoutubeFocused(false)}
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  className="flex-1 border-0 bg-transparent font-mono text-[15px] text-[#ececec] outline-none placeholder:text-[#5c5c5c]"
+                />
+              </div>
+              <p className="font-mono text-[13px] text-[#7a7a7a]">
+                Paste a public YouTube URL. We&apos;ll fetch the audio and
+                transcribe it.
+              </p>
+            </div>
           ) : (
-            <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {existingUploads.map((entry) => {
-                const isSelected = selectedUploadId === entry.id;
+            <div
+              key="storage-input"
+              className="flex min-h-[160px] flex-col justify-center"
+            >
+              {existingUploadsError ? (
+                <p className="font-mono text-xs text-rec">
+                  Failed to load storage: {existingUploadsError}
+                </p>
+              ) : existingUploads === null ? (
+                <p className="font-mono text-xs text-muted">
+                  Loading storage...
+                </p>
+              ) : existingUploads.length === 0 ? (
+                <p className="font-mono text-xs text-muted">
+                  No videos in storage yet. Upload a file or a YouTube link
+                  first.
+                </p>
+              ) : (
+                <ul className="flex gap-3 overflow-x-auto pb-2">
+                  {existingUploads.map((entry) => {
+                    const isSelected = selectedUploadId === entry.id;
 
-                return (
-                  <li key={entry.id}>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedUploadId(entry.id)}
-                      className={`flex w-full flex-col gap-2 rounded-md border p-2 text-left transition-colors ${
-                        isSelected
-                          ? "border-accent bg-accent/10"
-                          : "border-border hover:bg-surface-hover"
-                      }`}
-                    >
-                      <video
-                        preload="metadata"
-                        src={`/api/upload/${entry.id}/file`}
-                        className="aspect-video w-full rounded border border-border bg-background object-cover"
-                      />
-                      <span
-                        className="truncate font-mono text-xs text-foreground"
-                        title={entry.filename}
-                      >
-                        {entry.filename}
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+                    return (
+                      <li key={entry.id} className="w-[200px] shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedUploadId(entry.id)}
+                          className={`flex w-full flex-col gap-2 rounded-md border p-2 text-left transition-colors ${
+                            isSelected
+                              ? "border-accent bg-accent/10"
+                              : "border-border hover:bg-surface-hover"
+                          }`}
+                        >
+                          <video
+                            preload="metadata"
+                            src={`/api/upload/${entry.id}/file`}
+                            className="aspect-video w-full rounded border border-border bg-background object-cover"
+                          />
+                          <span
+                            className="truncate font-mono text-xs text-foreground"
+                            title={entry.filename}
+                          >
+                            {entry.filename}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
           )}
           <button
             type="submit"
-            disabled={isBusy}
-            className="self-start rounded-md bg-accent px-4 py-2 text-sm font-semibold text-background transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={isBusy || !canAdvance}
+            className="w-full rounded-md px-4 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed"
+            style={
+              isBusy || !canAdvance
+                ? { background: "#241a16", color: "#6a5850" }
+                : {
+                    background: "#ff5a2c",
+                    color: "#0a0a0a",
+                    boxShadow: "0 4px 14px -4px rgba(255, 90, 44, 0.6)",
+                  }
+            }
           >
-            {isBusy
-              ? "Processing..."
-              : uploadMode === "file"
-                ? "Upload and transcribe"
-                : uploadMode === "youtube"
-                  ? "Download and transcribe"
-                  : "Use this video and transcribe"}
+            {isBusy ? "Processing..." : "Start Clipping"}
           </button>
         </form>
         {status && <StatusLine busy={isBusy || isCuttingClips} text={status} />}

@@ -8,6 +8,7 @@ import { PostsTab } from "@/app/web/PostsTab";
 import { StorageTab } from "@/app/web/StorageTab";
 import { AccountsTab } from "@/app/web/AccountsTab";
 import { AnalyticsTab } from "@/app/web/AnalyticsTab";
+import { SettingsTab } from "@/app/web/SettingsTab";
 import { Sidebar, Tab } from "@/app/web/Sidebar";
 
 export default function Home() {
@@ -25,6 +26,7 @@ export default function Home() {
           {tab === "storage" && <StorageTab />}
           {tab === "accounts" && <AccountsTab />}
           {tab === "analytics" && <AnalyticsTab />}
+          {tab === "settings" && <SettingsTab />}
         </div>
       </main>
     </div>

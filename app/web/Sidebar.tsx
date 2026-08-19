@@ -10,6 +10,7 @@ import {
   IconFolder,
   IconPerson,
   IconPost,
+  IconSettings,
   IconStar,
 } from "./icons";
 
@@ -20,7 +21,8 @@ export type Tab =
   | "posts"
   | "storage"
   | "accounts"
-  | "analytics";
+  | "analytics"
+  | "settings";
 
 export function Sidebar({ tab, onChange }: { tab: Tab; onChange: (tab: Tab) => void }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -96,6 +98,13 @@ export function Sidebar({ tab, onChange }: { tab: Tab; onChange: (tab: Tab) => v
           active={tab === "accounts"}
           collapsed={collapsed}
           onClick={() => onChange("accounts")}
+        />
+        <NavItem
+          icon={<IconSettings className="h-5 w-5" />}
+          label="Settings"
+          active={tab === "settings"}
+          collapsed={collapsed}
+          onClick={() => onChange("settings")}
         />
       </div>
 

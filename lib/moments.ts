@@ -10,6 +10,29 @@ export function isGrade(value: unknown): value is Grade {
     );
 }
 
+/**
+ * The LLM produces viralityScore and the three grades (hook/flow/engagement) as separate
+ * judgments, which can disagree and read as an inconsistent verdict to the user. We calculate
+ * a weighted average dominated by the grades (80% combined) so the displayed score always
+ * stays close to what the grades imply, while still keeping a 20% share for the LLM's own
+ * holistic score. Hook is weighted heaviest among the grades because landing the hook in the
+ * first 1-2 seconds is the single biggest driver of whether a clip gets watched.
+ */
+
+const GRADE_VAL: Record<Grade, number> = {
+    F: 10,
+    D: 30,
+    C: 50,
+    B: 70,
+    A: 90,
+    S: 100,
+};
+
+export function computeViralityScore(rawScore: number, hook: Grade, flow: Grade, engagement: Grade): number {
+    const vScore = GRADE_VAL[hook] * 0.4 + GRADE_VAL[flow] * 0.2 + GRADE_VAL[engagement] * 0.2 + rawScore * 0.2;
+    return Math.round(vScore);
+}
+
 export const MOMENT_SCHEMA = {
     type: "object",
     properties: {
@@ -101,6 +124,8 @@ Identify up to 10 of the strongest standalone moments (self-contained stories, s
 - hookGrade: a letter grade (S, A, B, C, D, or F) for how strongly the first 1-2 seconds grab attention
 - flowGrade: a letter grade (S, A, B, C, D, or F) for how well the moment holds together and paces as a standalone clip
 - engagementGrade: a letter grade (S, A, B, C, D, or F) for how likely viewers are to comment, share, or rewatch
+
+Be a harsh, skeptical critic, not a cheerleader. Most moments in a typical transcript are mediocre as standalone clips, so most scores and grades should reflect that. If nothing in the transcript is genuinely exceptional, it is fine and expected for every returned moment to grade out as average or below.
 
 Do not use em dashes (—) anywhere in the title, reason, or description. Use commas, periods, or parentheses instead.
 

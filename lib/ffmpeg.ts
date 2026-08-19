@@ -1,7 +1,13 @@
 import { execFile } from "child_process";
+import path from "path";
 import { promisify } from "util";
 
 const execFileAsync = promisify(execFile);
+
+// Vendored caption fonts (e.g. Montserrat ExtraBold for the "greenPop" preset)
+// so burned-in captions render consistently without relying on the host
+// having them installed system-wide.
+const FONTS_DIR = path.join(process.cwd(), "lib", "fonts");
 
 // v1 reframe: a centered 9:16 crop of the source frame. This assumes a
 // single dominant subject roughly centered in the shot — good enough for
@@ -19,7 +25,7 @@ export async function cutClip(
 ): Promise<void> {
   const duration = end - start;
   const videoFilter = assPath
-    ? `${VERTICAL_CROP_FILTER},ass='${escapeFfmpegFilterPath(assPath)}'`
+    ? `${VERTICAL_CROP_FILTER},ass='${escapeFfmpegFilterPath(assPath)}':fontsdir='${escapeFfmpegFilterPath(FONTS_DIR)}'`
     : VERTICAL_CROP_FILTER;
 
   await execFileAsync("ffmpeg", [

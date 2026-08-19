@@ -3,6 +3,7 @@ import { WhisperWord } from "@/lib/whisper";
 import {
   buildMomentsPrompt,
   buildTimestampedTranscript,
+  computeViralityScore,
   Grade,
   MOMENT_SCHEMA,
 } from "@/lib/moments";
@@ -49,6 +50,14 @@ export class AnalyzeService {
     }
 
     const parsed: { moments: Moment[] } = JSON.parse(block.text);
-    return parsed.moments;
+    return parsed.moments.map((moment) => ({
+      ...moment,
+      viralityScore: computeViralityScore(
+        moment.viralityScore,
+        moment.hookGrade,
+        moment.flowGrade,
+        moment.engagementGrade,
+      ),
+    }));
   };
 }
