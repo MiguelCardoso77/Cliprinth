@@ -1,7 +1,13 @@
 import { randomUUID } from "crypto";
 import { mkdir, writeFile } from "fs/promises";
-import { buildAssCaptions, CaptionPresetId, CaptionWord, DEFAULT_CAPTION_PRESET } from "@/lib/ass";
+import {
+  buildAssCaptions,
+  CaptionPresetId,
+  CaptionWord,
+  DEFAULT_CAPTION_PRESET,
+} from "@/lib/ass";
 import { cutClip } from "@/lib/ffmpeg";
+import { Grade } from "@/lib/moments";
 import {
   findUploadedFile,
   getProject,
@@ -24,6 +30,9 @@ export type MomentInput = {
   description: string;
   hashtags: string[];
   viralityScore: number;
+  hookGrade: Grade;
+  flowGrade: Grade;
+  engagementGrade: Grade;
 };
 export type CreateProjectResult = { projectId: string };
 
@@ -34,7 +43,7 @@ export class ProjectsService {
     uploadId: string,
     moments: MomentInput[],
     words: CaptionWord[],
-    captionPreset: CaptionPresetId = DEFAULT_CAPTION_PRESET
+    captionPreset: CaptionPresetId = DEFAULT_CAPTION_PRESET,
   ): string => {
     const jobId = randomUUID();
     this.jobs.create(jobId);
@@ -54,7 +63,10 @@ export class ProjectsService {
     return getProject(projectId);
   };
 
-  public renameProject = (projectId: string, name: string): Promise<ProjectMeta | null> => {
+  public renameProject = (
+    projectId: string,
+    name: string,
+  ): Promise<ProjectMeta | null> => {
     return renameProject(projectId, name);
   };
 
@@ -63,7 +75,7 @@ export class ProjectsService {
     uploadId: string,
     moments: MomentInput[],
     words: CaptionWord[],
-    captionPreset: CaptionPresetId
+    captionPreset: CaptionPresetId,
   ) => {
     this.jobs.update(jobId, { status: "processing" });
 
@@ -78,16 +90,22 @@ export class ProjectsService {
         const moment = moments[index];
         const clipFile = `${index}.mp4`;
 
-        const captionsPath = getProjectCaptionsPath(projectId, index);
-        const clipWords = wordsForMoment(words, moment.start, moment.end);
-        await writeFile(captionsPath, buildAssCaptions(clipWords, captionPreset));
+        let captionsPath: string | undefined;
+        if (captionPreset !== "none") {
+          captionsPath = getProjectCaptionsPath(projectId, index);
+          const clipWords = wordsForMoment(words, moment.start, moment.end);
+          await writeFile(
+            captionsPath,
+            buildAssCaptions(clipWords, captionPreset),
+          );
+        }
 
         await cutClip(
           inputPath,
           moment.start,
           moment.end,
           getProjectClipPath(projectId, clipFile),
-          captionsPath
+          captionsPath,
         );
 
         projectMoments.push({ ...moment, clipFile });
@@ -100,7 +118,10 @@ export class ProjectsService {
         moments: projectMoments,
       };
 
-      await writeFile(getProjectMetaPath(projectId), JSON.stringify(meta, null, 2));
+      await writeFile(
+        getProjectMetaPath(projectId),
+        JSON.stringify(meta, null, 2),
+      );
 
       this.jobs.update(jobId, { status: "done", result: { projectId } });
     } catch (error) {
@@ -114,7 +135,11 @@ export class ProjectsService {
 
 // Keeps only words overlapping the moment's window and shifts their
 // timestamps to be relative to the clip's own start (0 = first frame).
-function wordsForMoment(words: CaptionWord[], momentStart: number, momentEnd: number): CaptionWord[] {
+function wordsForMoment(
+  words: CaptionWord[],
+  momentStart: number,
+  momentEnd: number,
+): CaptionWord[] {
   const duration = momentEnd - momentStart;
 
   return words

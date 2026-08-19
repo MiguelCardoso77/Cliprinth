@@ -1,8 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { buildMomentsPrompt, buildTimestampedTranscript } from "@/lib/moments";
-import { CAPTION_PRESETS, CaptionPresetId, DEFAULT_CAPTION_PRESET } from "@/lib/ass";
+import { useMemo, useState } from "react";
+import {
+  buildMomentsPrompt,
+  buildTimestampedTranscript,
+  Grade,
+} from "@/lib/moments";
+import {
+  CAPTION_PRESETS,
+  CaptionPresetId,
+  DEFAULT_CAPTION_PRESET,
+} from "@/lib/ass";
 import { TimecodeRange, ViralityBadge } from "./Timecode";
 import { TrimEditor } from "./TrimEditor";
 
@@ -16,9 +24,17 @@ type Moment = {
   description: string;
   hashtags: string[];
   viralityScore: number;
+  hookGrade: Grade;
+  flowGrade: Grade;
+  engagementGrade: Grade;
 };
 type ProjectMoment = Moment & { clipFile: string };
-type Project = { id: string; uploadId: string; createdAt: string; moments: ProjectMoment[] };
+type Project = {
+  id: string;
+  uploadId: string;
+  createdAt: string;
+  moments: ProjectMoment[];
+};
 
 // Until ANTHROPIC_API_KEY is configured, analysis is done manually:
 // copy the generated prompt into a Claude conversation and paste the JSON back.
@@ -45,7 +61,9 @@ async function pollTranscription(jobId: string): Promise<Word[]> {
   }
 }
 
-async function pollYoutubeDownload(jobId: string): Promise<{ id: string; filename: string }> {
+async function pollYoutubeDownload(
+  jobId: string,
+): Promise<{ id: string; filename: string }> {
   while (true) {
     const response = await fetch(`/api/upload/youtube/${jobId}`);
     const job = await response.json();
@@ -92,18 +110,27 @@ export function NewTab() {
   const [isBusy, setIsBusy] = useState(false);
   const [transcript, setTranscript] = useState<Word[] | null>(null);
   const [moments, setMoments] = useState<Moment[] | null>(null);
-  const [manualPrompt, setManualPrompt] = useState<string | null>(null);
+  const [showManualPrompt, setShowManualPrompt] = useState(false);
+  const [campaignRules, setCampaignRules] = useState("");
   const [pasteInput, setPasteInput] = useState("");
   const [pasteError, setPasteError] = useState<string | null>(null);
   const [uploadId, setUploadId] = useState<string | null>(null);
   const [project, setProject] = useState<Project | null>(null);
   const [projectError, setProjectError] = useState<string | null>(null);
   const [isCuttingClips, setIsCuttingClips] = useState(false);
-  const [captionPreset, setCaptionPreset] = useState<CaptionPresetId>(DEFAULT_CAPTION_PRESET);
-  const [uploadMode, setUploadMode] = useState<"file" | "youtube" | "storage">("file");
+  const [captionPreset, setCaptionPreset] = useState<CaptionPresetId>(
+    DEFAULT_CAPTION_PRESET,
+  );
+  const [uploadMode, setUploadMode] = useState<"file" | "youtube" | "storage">(
+    "file",
+  );
   const [youtubeUrl, setYoutubeUrl] = useState("");
-  const [existingUploads, setExistingUploads] = useState<UploadEntry[] | null>(null);
-  const [existingUploadsError, setExistingUploadsError] = useState<string | null>(null);
+  const [existingUploads, setExistingUploads] = useState<UploadEntry[] | null>(
+    null,
+  );
+  const [existingUploadsError, setExistingUploadsError] = useState<
+    string | null
+  >(null);
   const [selectedUploadId, setSelectedUploadId] = useState<string | null>(null);
 
   function handleUploadModeChange(mode: "file" | "youtube" | "storage") {
@@ -121,7 +148,7 @@ export function NewTab() {
     event.preventDefault();
     setTranscript(null);
     setMoments(null);
-    setManualPrompt(null);
+    setShowManualPrompt(false);
     setPasteInput("");
     setPasteError(null);
     setUploadId(null);
@@ -161,7 +188,9 @@ export function NewTab() {
 
       uploadResult = result;
     } else if (uploadMode === "storage") {
-      const entry = existingUploads?.find((upload) => upload.id === selectedUploadId);
+      const entry = existingUploads?.find(
+        (upload) => upload.id === selectedUploadId,
+      );
 
       if (!entry) {
         setStatus("Pick a video from storage first.");
@@ -232,10 +261,9 @@ export function NewTab() {
     }
 
     if (!USE_ANTHROPIC_API) {
-      const prompt = buildMomentsPrompt(buildTimestampedTranscript(words));
-      setManualPrompt(prompt);
+      setShowManualPrompt(true);
       setStatus(
-        "Transcription complete. Copy the prompt below into a Claude conversation and paste the JSON response back."
+        "Transcription complete. Add campaign rules if needed, then copy the prompt below into a Claude conversation and paste the JSON response back.",
       );
       setIsBusy(false);
       return;
@@ -247,7 +275,7 @@ export function NewTab() {
       const analyzeResponse = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ words }),
+        body: JSON.stringify({ words, campaignRules }),
       });
 
       const analyzeResult = await analyzeResponse.json();
@@ -258,14 +286,27 @@ export function NewTab() {
 
       setMoments(analyzeResult.moments);
       setStatus(
-        `Analysis complete. ${analyzeResult.moments.length} suggested moments. Pick a caption style below and cut the clips.`
+        `Analysis complete. ${analyzeResult.moments.length} suggested moments. Pick a caption style below and cut the clips.`,
       );
     } catch (error) {
-      setStatus(`Transcription complete, but analysis failed: ${(error as Error).message}`);
+      setStatus(
+        `Transcription complete, but analysis failed: ${(error as Error).message}`,
+      );
     } finally {
       setIsBusy(false);
     }
   }
+
+  const manualPrompt = useMemo(
+    () =>
+      showManualPrompt && transcript
+        ? buildMomentsPrompt(
+            buildTimestampedTranscript(transcript),
+            campaignRules,
+          )
+        : null,
+    [showManualPrompt, transcript, campaignRules],
+  );
 
   async function handleCopyPrompt() {
     if (!manualPrompt) return;
@@ -291,21 +332,32 @@ export function NewTab() {
 
     setMoments(parsedMoments);
     setStatus(
-      `${parsedMoments.length} moments loaded from the pasted response. Pick a caption style below and cut the clips.`
+      `${parsedMoments.length} moments loaded from the pasted response. Pick a caption style below and cut the clips.`,
     );
   }
 
-  async function createProject(forUploadId: string, momentsToCut: Moment[], words: Word[]) {
+  async function createProject(
+    forUploadId: string,
+    momentsToCut: Moment[],
+    words: Word[],
+  ) {
     setProject(null);
     setProjectError(null);
     setIsCuttingClips(true);
-    setStatus(`Cutting ${momentsToCut.length} clip${momentsToCut.length === 1 ? "" : "s"}...`);
+    setStatus(
+      `Cutting ${momentsToCut.length} clip${momentsToCut.length === 1 ? "" : "s"}...`,
+    );
 
     try {
       const createResponse = await fetch("/api/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ uploadId: forUploadId, moments: momentsToCut, words, captionPreset }),
+        body: JSON.stringify({
+          uploadId: forUploadId,
+          moments: momentsToCut,
+          words,
+          captionPreset,
+        }),
       });
 
       const createResult = await createResponse.json();
@@ -324,7 +376,9 @@ export function NewTab() {
       }
 
       setProject(projectData);
-      setStatus(`${projectData.moments.length} clips cut and saved to project ${projectId.slice(0, 8)}.`);
+      setStatus(
+        `${projectData.moments.length} clips cut and saved to project ${projectId.slice(0, 8)}.`,
+      );
     } catch (error) {
       setProjectError((error as Error).message);
       setStatus(`Failed to cut clips: ${(error as Error).message}`);
@@ -338,11 +392,16 @@ export function NewTab() {
     await createProject(uploadId, moments, transcript);
   }
 
-  function handleTrimChange(index: number, next: { start: number; end: number }) {
+  function handleTrimChange(
+    index: number,
+    next: { start: number; end: number },
+  ) {
     setMoments((current) =>
       current
-        ? current.map((moment, i) => (i === index ? { ...moment, ...next } : moment))
-        : current
+        ? current.map((moment, i) =>
+            i === index ? { ...moment, ...next } : moment,
+          )
+        : current,
     );
   }
 
@@ -385,7 +444,10 @@ export function NewTab() {
             From storage
           </button>
         </div>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
+        <form
+          onSubmit={handleSubmit}
+          className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4"
+        >
           {uploadMode === "file" ? (
             <input
               key="file-input"
@@ -404,7 +466,9 @@ export function NewTab() {
               className="rounded-md border border-border bg-background px-3 py-2 font-mono text-xs text-foreground placeholder:text-muted"
             />
           ) : existingUploadsError ? (
-            <p className="font-mono text-xs text-rec">Failed to load storage: {existingUploadsError}</p>
+            <p className="font-mono text-xs text-rec">
+              Failed to load storage: {existingUploadsError}
+            </p>
           ) : existingUploads === null ? (
             <p className="font-mono text-xs text-muted">Loading storage...</p>
           ) : existingUploads.length === 0 ? (
@@ -461,21 +525,29 @@ export function NewTab() {
         {status && <StatusLine busy={isBusy || isCuttingClips} text={status} />}
       </section>
 
-      {transcript && (
-        <section className="flex flex-col gap-3">
-          <SectionLabel index="02" title="Transcript" />
-          <p className="max-h-56 overflow-y-auto rounded-lg border border-border bg-surface p-4 font-mono text-xs leading-relaxed text-foreground/90">
-            {transcript.map((w) => w.word).join(" ")}
-          </p>
-        </section>
-      )}
-
       {manualPrompt && (
         <section className="flex flex-col gap-3">
-          <SectionLabel index="03" title="Manual bridge to Claude" />
+          <SectionLabel index="02" title="Manual bridge to Claude" />
           <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
+            <span className="font-mono text-xs uppercase tracking-wide text-muted">
+              Campaign rules (optional)
+            </span>
+            <textarea
+              value={campaignRules}
+              onChange={(event) => setCampaignRules(event.target.value)}
+              rows={3}
+              placeholder="e.g. no politics or profanity, keep clips under 45s, always mention the sponsor, avoid clips featuring guest X..."
+              className="rounded-md border border-border bg-background p-3 font-mono text-xs text-foreground placeholder:text-muted"
+            />
+            <p className="-mt-1 font-mono text-[11px] text-muted">
+              Applied when picking moments and writing descriptions/hashtags
+              below.
+            </p>
+
             <div className="flex items-center justify-between">
-              <span className="font-mono text-xs uppercase tracking-wide text-muted">Prompt</span>
+              <span className="font-mono text-xs uppercase tracking-wide text-muted">
+                Prompt
+              </span>
               <button
                 type="button"
                 onClick={handleCopyPrompt}
@@ -491,7 +563,9 @@ export function NewTab() {
               className="rounded-md border border-border bg-background p-3 font-mono text-xs text-foreground/80"
             />
 
-            <span className="font-mono text-xs uppercase tracking-wide text-muted">Response</span>
+            <span className="font-mono text-xs uppercase tracking-wide text-muted">
+              Response
+            </span>
             <textarea
               value={pasteInput}
               onChange={(event) => setPasteInput(event.target.value)}
@@ -511,32 +585,16 @@ export function NewTab() {
         </section>
       )}
 
-      {moments && moments.length > 0 && !project && uploadId && (
-        <section className="flex flex-col gap-3">
-          <SectionLabel index="04" title="Refine cut points" />
-          <p className="font-mono text-xs text-muted">
-            Nudge the in/out points so the hook lands right at the start — the AI only sees text, so
-            it can be off by a second or two.
-          </p>
-          <div className="flex flex-col gap-3">
-            {moments.map((moment, index) => (
-              <TrimEditor
-                key={index}
-                uploadId={uploadId}
-                moment={moment}
-                onChange={(next) => handleTrimChange(index, next)}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
       {moments && moments.length > 0 && !project && (
         <section className="flex flex-col gap-3">
-          <SectionLabel index="05" title="Caption style" />
-          <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {(Object.keys(CAPTION_PRESETS) as CaptionPresetId[]).map((presetId) => {
+          <SectionLabel index="03" title="Caption style" />
+          <p className="font-mono text-xs text-muted">
+            Pick a style now so the preview below shows captions while you
+            refine the in/out points.
+          </p>
+          <div className="grid grid-cols-1 gap-2 rounded-lg border border-border bg-surface p-4 sm:grid-cols-2">
+            {(Object.keys(CAPTION_PRESETS) as CaptionPresetId[]).map(
+              (presetId) => {
                 const preset = CAPTION_PRESETS[presetId];
                 const isSelected = captionPreset === presetId;
 
@@ -551,37 +609,75 @@ export function NewTab() {
                         : "border-border hover:bg-surface-hover"
                     }`}
                   >
-                    <span className="text-sm font-medium text-foreground">{preset.label}</span>
-                    <span className="text-xs text-muted">{preset.description}</span>
+                    <span className="text-sm font-medium text-foreground">
+                      {preset.label}
+                    </span>
+                    <span className="text-xs text-muted">
+                      {preset.description}
+                    </span>
                   </button>
                 );
-              })}
-            </div>
-            <button
-              type="button"
-              onClick={handleCutClips}
-              disabled={isCuttingClips}
-              className="self-start rounded-md bg-accent px-4 py-2 text-sm font-semibold text-background transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isCuttingClips ? "Cutting..." : "Cut clips"}
-            </button>
+              },
+            )}
           </div>
+        </section>
+      )}
+
+      {moments && moments.length > 0 && !project && uploadId && (
+        <section className="flex flex-col gap-3">
+          <SectionLabel index="04" title="Refine cut points" />
+          <p className="font-mono text-xs text-muted">
+            Nudge the in/out points so the hook lands right at the start — the
+            AI only sees text, so it can be off by a second or two. Captions
+            preview using the style picked above.
+          </p>
+          <div className="flex flex-col gap-3">
+            {moments.map((moment, index) => (
+              <TrimEditor
+                key={index}
+                uploadId={uploadId}
+                moment={moment}
+                words={transcript ?? []}
+                captionPreset={captionPreset}
+                onChange={(next) => handleTrimChange(index, next)}
+              />
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={handleCutClips}
+            disabled={isCuttingClips}
+            className="self-start rounded-md bg-accent px-4 py-2 text-sm font-semibold text-background transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isCuttingClips ? "Cutting..." : "Cut clips"}
+          </button>
         </section>
       )}
 
       {moments && moments.length > 0 && (
         <section className="flex flex-col gap-3">
-          <SectionLabel index="06" title="Suggested moments" />
-          {projectError && <p className="text-xs text-rec">Failed to cut clips: {projectError}</p>}
+          <SectionLabel index="05" title="Suggested moments" />
+          {projectError && (
+            <p className="text-xs text-rec">
+              Failed to cut clips: {projectError}
+            </p>
+          )}
           <ul className="flex flex-col gap-3">
             {moments.map((moment, index) => {
-              const clipUrl = project ? `/api/projects/${project.id}/clips/${index}/file` : null;
+              const clipUrl = project
+                ? `/api/projects/${project.id}/clips/${index}/file`
+                : null;
 
               return (
-                <li key={index} className="rounded-lg border border-border bg-surface p-4">
+                <li
+                  key={index}
+                  className="rounded-lg border border-border bg-surface p-4"
+                >
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <span className="flex items-center gap-2">
-                      <span className="font-medium text-foreground">{moment.title}</span>
+                      <span className="font-medium text-foreground">
+                        {moment.title}
+                      </span>
                       {typeof moment.viralityScore === "number" && (
                         <ViralityBadge score={moment.viralityScore} />
                       )}
@@ -590,10 +686,14 @@ export function NewTab() {
                   </div>
                   <p className="mt-1 text-sm text-muted">{moment.reason}</p>
                   {moment.description && (
-                    <p className="mt-2 text-sm text-foreground/90">{moment.description}</p>
+                    <p className="mt-2 text-sm text-foreground/90">
+                      {moment.description}
+                    </p>
                   )}
                   {moment.hashtags && moment.hashtags.length > 0 && (
-                    <p className="mt-1 font-mono text-xs text-accent">{moment.hashtags.join(" ")}</p>
+                    <p className="mt-1 font-mono text-xs text-accent">
+                      {moment.hashtags.join(" ")}
+                    </p>
                   )}
 
                   <div className="mt-3">
@@ -604,7 +704,9 @@ export function NewTab() {
                         className="w-full max-w-xs rounded-md border border-border"
                       />
                     ) : isCuttingClips ? (
-                      <p className="font-mono text-xs text-muted">Cutting clip...</p>
+                      <p className="font-mono text-xs text-muted">
+                        Cutting clip...
+                      </p>
                     ) : null}
                   </div>
                 </li>
@@ -621,7 +723,9 @@ function SectionLabel({ index, title }: { index: string; title: string }) {
   return (
     <div className="flex items-baseline gap-2">
       <span className="font-mono text-xs text-accent">{index}</span>
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">{title}</h2>
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">
+        {title}
+      </h2>
     </div>
   );
 }

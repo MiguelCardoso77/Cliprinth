@@ -4,8 +4,8 @@ export type CaptionWord = { word: string; start: number; end: number };
 // hits first: word count or elapsed time, so lines stay readable on a
 // vertical frame. Presets may override the word-count limit (see
 // CaptionStyle.chunkMaxWords) for tighter, punchier lines.
-const CHUNK_MAX_WORDS = 4;
-const CHUNK_MAX_SECONDS = 2.5;
+export const CHUNK_MAX_WORDS = 4;
+export const CHUNK_MAX_SECONDS = 2.5;
 
 // ASS colours are &H<AA><BB><GG><RR> (alpha, then blue/green/red, each hex).
 export type CaptionStyle = {
@@ -66,22 +66,10 @@ export const CAPTION_PRESETS = {
       marginV: 180,
     },
   },
-  blackBox: {
-    label: "Black Box",
-    description: "White text on a solid black box, no outline.",
-    style: {
-      fontName: "Arial Black",
-      fontSize: 66,
-      primaryColour: "&H00FFFFFF",
-      outlineColour: "&H00000000",
-      backColour: "&HFF000000",
-      bold: 1,
-      borderStyle: 3,
-      outline: 0,
-      shadow: 0,
-      alignment: 2,
-      marginV: 180,
-    },
+  none: {
+    label: "No Captions",
+    description: "Skip burned-in captions entirely — just the raw reframed clip.",
+    style: null,
   },
   greenPop: {
     label: "Green Pop",
@@ -106,7 +94,7 @@ export const CAPTION_PRESETS = {
       uppercase: true,
     },
   },
-} as const satisfies Record<string, { label: string; description: string; style: CaptionStyle }>;
+} as const satisfies Record<string, { label: string; description: string; style: CaptionStyle | null }>;
 
 export type CaptionPresetId = keyof typeof CAPTION_PRESETS;
 export const DEFAULT_CAPTION_PRESET: CaptionPresetId = "classic";
@@ -115,17 +103,16 @@ export function isCaptionPresetId(value: unknown): value is CaptionPresetId {
   return typeof value === "string" && value in CAPTION_PRESETS;
 }
 
-type Chunk = { words: CaptionWord[]; start: number; end: number };
+export type Chunk = { words: CaptionWord[]; start: number; end: number };
 
 export function buildAssCaptions(
   words: CaptionWord[],
   presetId: CaptionPresetId = DEFAULT_CAPTION_PRESET
 ): string {
-  const { style } = (CAPTION_PRESETS[presetId] ?? CAPTION_PRESETS[DEFAULT_CAPTION_PRESET]) as {
-    label: string;
-    description: string;
-    style: CaptionStyle;
-  };
+  const style = CAPTION_PRESETS[presetId].style as CaptionStyle | null;
+  if (!style) {
+    throw new Error(`buildAssCaptions called with a no-captions preset ("${presetId}")`);
+  }
 
   const header = `[Script Info]
 ScriptType: v4.00+
@@ -155,7 +142,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 // chunk whenever it would run longer than CHUNK_MAX_SECONDS. Keeps each
 // chunk's own word list (not just the joined text) so per-word event
 // generation (buildHighlightEvents) has individual timestamps to work with.
-function buildChunks(words: CaptionWord[], maxWords: number): Chunk[] {
+export function buildChunks(words: CaptionWord[], maxWords: number): Chunk[] {
   const chunks: Chunk[] = [];
   let current: CaptionWord[] = [];
 
@@ -258,6 +245,20 @@ function assInlineColour(hex: string): string {
   const g = h.slice(2, 4);
   const b = h.slice(4, 6);
   return `&H${b}${g}${r}&`.toUpperCase();
+}
+
+// &H<AA><BB><GG><RR> (ASS's [V4+ Styles] colour format) -> a CSS rgba()
+// string, for approximating a preset's look in an on-page preview. ASS
+// alpha is inverted (00 = opaque, FF = fully transparent).
+export function assColourToCss(assColour: string): string {
+  const hex = assColour.replace(/^&H/i, "").replace(/&$/, "").padStart(8, "0");
+  const aa = hex.slice(-8, -6);
+  const bb = hex.slice(-6, -4);
+  const gg = hex.slice(-4, -2);
+  const rr = hex.slice(-2);
+
+  const alpha = 1 - parseInt(aa, 16) / 255;
+  return `rgba(${parseInt(rr, 16)}, ${parseInt(gg, 16)}, ${parseInt(bb, 16)}, ${alpha.toFixed(3)})`;
 }
 
 function formatAssTime(seconds: number): string {

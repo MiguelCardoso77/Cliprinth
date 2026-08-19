@@ -1,8 +1,25 @@
-import { readdir, readFile, rm, stat, writeFile } from "fs/promises";
+import { randomUUID } from "crypto";
+import {
+  mkdir,
+  readdir,
+  readFile,
+  rename,
+  rm,
+  stat,
+  writeFile,
+} from "fs/promises";
 import path from "path";
+import { Grade } from "./moments";
 
 export const UPLOAD_DIR = path.join(process.cwd(), "storage", "uploads");
 export const CLIPS_DIR = path.join(process.cwd(), "storage", "clips");
+export const POSTS_FILE = path.join(process.cwd(), "storage", "posts.json");
+export const SHORTLIST_DIR = path.join(process.cwd(), "storage", "shortlist");
+export const SHORTLIST_FILE = path.join(
+  process.cwd(),
+  "storage",
+  "shortlist.json",
+);
 
 export async function findUploadedFile(id: string): Promise<string> {
   const jobDir = path.join(UPLOAD_DIR, id);
@@ -15,7 +32,12 @@ export async function findUploadedFile(id: string): Promise<string> {
   return path.join(jobDir, files[0]);
 }
 
-export type UploadEntry = { id: string; filename: string; path: string; createdAt: string };
+export type UploadEntry = {
+  id: string;
+  filename: string;
+  path: string;
+  createdAt: string;
+};
 
 export async function listUploads(): Promise<UploadEntry[]> {
   const ids = await readdir(UPLOAD_DIR).catch(() => []);
@@ -54,7 +76,14 @@ export type ProjectMoment = {
   description: string;
   hashtags: string[];
   viralityScore: number;
+  hookGrade: Grade;
+  flowGrade: Grade;
+  engagementGrade: Grade;
   clipFile: string;
+  // Set once this clip has been picked for the shortlist — its file has been
+  // moved out of the project directory to SHORTLIST_DIR, so the project's own
+  // clip file route no longer has anything to serve for it.
+  shortlistId?: string;
 };
 
 export type ProjectMeta = {
@@ -73,15 +102,23 @@ export function getProjectMetaPath(projectId: string): string {
   return path.join(getProjectDir(projectId), "project.json");
 }
 
-export function getProjectClipPath(projectId: string, clipFile: string): string {
+export function getProjectClipPath(
+  projectId: string,
+  clipFile: string,
+): string {
   return path.join(getProjectDir(projectId), clipFile);
 }
 
-export function getProjectCaptionsPath(projectId: string, index: number): string {
+export function getProjectCaptionsPath(
+  projectId: string,
+  index: number,
+): string {
   return path.join(getProjectDir(projectId), `${index}.ass`);
 }
 
-export async function getProject(projectId: string): Promise<ProjectMeta | null> {
+export async function getProject(
+  projectId: string,
+): Promise<ProjectMeta | null> {
   try {
     const raw = await readFile(getProjectMetaPath(projectId), "utf-8");
     return JSON.parse(raw);
@@ -90,12 +127,18 @@ export async function getProject(projectId: string): Promise<ProjectMeta | null>
   }
 }
 
-export async function renameProject(projectId: string, name: string): Promise<ProjectMeta | null> {
+export async function renameProject(
+  projectId: string,
+  name: string,
+): Promise<ProjectMeta | null> {
   const project = await getProject(projectId);
   if (!project) return null;
 
   const updated: ProjectMeta = { ...project, name };
-  await writeFile(getProjectMetaPath(projectId), JSON.stringify(updated, null, 2));
+  await writeFile(
+    getProjectMetaPath(projectId),
+    JSON.stringify(updated, null, 2),
+  );
   return updated;
 }
 
@@ -109,4 +152,135 @@ export async function listProjects(): Promise<ProjectMeta[]> {
   }
 
   return projects.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+// A post is a link to a video already published on an external platform
+// (YouTube, TikTok, Instagram). Cliprinth never publishes on the user's
+// behalf (see CLAUDE.md) — this just tracks and embeds what was posted
+// manually, for a single at-a-glance view. Stored as one JSON array since
+// the list is small and doesn't need per-entry files like uploads/projects.
+export type PostEntry = { id: string; url: string };
+
+// Stored oldest-first (append-only); readPosts/listPosts reverse it so
+// callers always see newest-first without the file itself needing reordering.
+async function readPosts(): Promise<PostEntry[]> {
+  try {
+    const raw = await readFile(POSTS_FILE, "utf-8");
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+async function writePosts(posts: PostEntry[]): Promise<void> {
+  await mkdir(path.dirname(POSTS_FILE), { recursive: true });
+  await writeFile(POSTS_FILE, JSON.stringify(posts, null, 2));
+}
+
+export async function listPosts(): Promise<PostEntry[]> {
+  const posts = await readPosts();
+  return [...posts].reverse();
+}
+
+export async function addPost(url: string): Promise<PostEntry> {
+  const posts = await readPosts();
+  const entry: PostEntry = { id: randomUUID(), url };
+  await writePosts([...posts, entry]);
+  return entry;
+}
+
+// A shortlisted clip is a project moment the user picked for closer review.
+// Picking physically moves the clip's mp4 out of the project directory into
+// SHORTLIST_DIR, so it survives independently of what happens to the rest of
+// the project's (unpicked) clips later.
+export type ShortlistEntry = {
+  id: string;
+  projectId: string;
+  momentIndex: number;
+  start: number;
+  end: number;
+  title: string;
+  reason: string;
+  description: string;
+  hashtags: string[];
+  viralityScore: number;
+  hookGrade: Grade;
+  flowGrade: Grade;
+  engagementGrade: Grade;
+  clipFile: string;
+};
+
+async function readShortlist(): Promise<ShortlistEntry[]> {
+  try {
+    const raw = await readFile(SHORTLIST_FILE, "utf-8");
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+async function writeShortlist(entries: ShortlistEntry[]): Promise<void> {
+  await mkdir(path.dirname(SHORTLIST_FILE), { recursive: true });
+  await writeFile(SHORTLIST_FILE, JSON.stringify(entries, null, 2));
+}
+
+export async function listShortlist(): Promise<ShortlistEntry[]> {
+  const entries = await readShortlist();
+  return [...entries].reverse();
+}
+
+export function getShortlistClipPath(clipFile: string): string {
+  return path.join(SHORTLIST_DIR, clipFile);
+}
+
+export async function pickClip(
+  projectId: string,
+  momentIndex: number,
+): Promise<ShortlistEntry> {
+  const project = await getProject(projectId);
+  if (!project) throw new Error(`Project not found: ${projectId}`);
+
+  const moment = project.moments[momentIndex];
+  if (!moment)
+    throw new Error(`Moment not found: ${projectId}[${momentIndex}]`);
+  if (moment.shortlistId) throw new Error("Clip already picked");
+
+  const id = randomUUID();
+  const clipFile = `${id}.mp4`;
+
+  await mkdir(SHORTLIST_DIR, { recursive: true });
+  await rename(
+    getProjectClipPath(projectId, moment.clipFile),
+    getShortlistClipPath(clipFile),
+  );
+
+  const entry: ShortlistEntry = {
+    id,
+    projectId,
+    momentIndex,
+    start: moment.start,
+    end: moment.end,
+    title: moment.title,
+    reason: moment.reason,
+    description: moment.description,
+    hashtags: moment.hashtags,
+    viralityScore: moment.viralityScore,
+    hookGrade: moment.hookGrade,
+    flowGrade: moment.flowGrade,
+    engagementGrade: moment.engagementGrade,
+    clipFile,
+  };
+
+  const entries = await readShortlist();
+  await writeShortlist([...entries, entry]);
+
+  const updatedMoments = project.moments.map((m, i) =>
+    i === momentIndex ? { ...m, shortlistId: id } : m,
+  );
+  await writeFile(
+    getProjectMetaPath(projectId),
+    JSON.stringify({ ...project, moments: updatedMoments }, null, 2),
+  );
+
+  return entry;
 }

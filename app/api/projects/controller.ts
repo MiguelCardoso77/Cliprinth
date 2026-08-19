@@ -1,18 +1,26 @@
 import { failure, Result, success } from "../utils/response";
 import { Job } from "../utils/jobStore";
-import { CaptionPresetId, CaptionWord, DEFAULT_CAPTION_PRESET, isCaptionPresetId } from "@/lib/ass";
+import {
+  CaptionPresetId,
+  CaptionWord,
+  DEFAULT_CAPTION_PRESET,
+  isCaptionPresetId,
+} from "@/lib/ass";
+import { isGrade } from "@/lib/moments";
 import { ProjectMeta } from "@/lib/storage";
 import { CreateProjectResult, MomentInput, projectsService } from "./service";
 
 export class ProjectsController {
   private service = projectsService;
 
-  public handleCreate = async (body: unknown): Promise<Result<{ jobId: string }>> => {
+  public handleCreate = async (
+    body: unknown,
+  ): Promise<Result<{ jobId: string }>> => {
     const parsed = parseCreateBody(body);
     if (!parsed) {
       return failure(
         "uploadId, a non-empty moments array, a words array, and (optionally) a valid captionPreset are required",
-        400
+        400,
       );
     }
 
@@ -20,12 +28,14 @@ export class ProjectsController {
       parsed.uploadId,
       parsed.moments,
       parsed.words,
-      parsed.captionPreset
+      parsed.captionPreset,
     );
     return success({ jobId }, 202);
   };
 
-  public handleJobStatus = async (jobId: string): Promise<Result<Job<CreateProjectResult>>> => {
+  public handleJobStatus = async (
+    jobId: string,
+  ): Promise<Result<Job<CreateProjectResult>>> => {
     const job = this.service.getJob(jobId);
 
     if (!job) {
@@ -40,7 +50,9 @@ export class ProjectsController {
     return success(projects);
   };
 
-  public handleGet = async (projectId: string): Promise<Result<ProjectMeta>> => {
+  public handleGet = async (
+    projectId: string,
+  ): Promise<Result<ProjectMeta>> => {
     const project = await this.service.getProject(projectId);
 
     if (!project) {
@@ -50,7 +62,10 @@ export class ProjectsController {
     return success(project);
   };
 
-  public handleRename = async (projectId: string, body: unknown): Promise<Result<ProjectMeta>> => {
+  public handleRename = async (
+    projectId: string,
+    body: unknown,
+  ): Promise<Result<ProjectMeta>> => {
     const name = parseRenameBody(body);
     if (name === null) {
       return failure("A non-empty name is required", 400);
@@ -77,13 +92,26 @@ function parseRenameBody(body: unknown): string | null {
 }
 
 function parseCreateBody(
-  body: unknown
-): { uploadId: string; moments: MomentInput[]; words: CaptionWord[]; captionPreset: CaptionPresetId } | null {
+  body: unknown,
+): {
+  uploadId: string;
+  moments: MomentInput[];
+  words: CaptionWord[];
+  captionPreset: CaptionPresetId;
+} | null {
   if (typeof body !== "object" || body === null) return null;
 
-  const { uploadId, moments, words, captionPreset } = body as Record<string, unknown>;
+  const { uploadId, moments, words, captionPreset } = body as Record<
+    string,
+    unknown
+  >;
 
-  if (typeof uploadId !== "string" || !Array.isArray(moments) || moments.length === 0 || !Array.isArray(words)) {
+  if (
+    typeof uploadId !== "string" ||
+    !Array.isArray(moments) ||
+    moments.length === 0 ||
+    !Array.isArray(words)
+  ) {
     return null;
   }
 
@@ -103,7 +131,10 @@ function parseCreateBody(
       typeof m.description === "string" &&
       Array.isArray(m.hashtags) &&
       m.hashtags.every((tag) => typeof tag === "string") &&
-      typeof m.viralityScore === "number"
+      typeof m.viralityScore === "number" &&
+      isGrade(m.hookGrade) &&
+      isGrade(m.flowGrade) &&
+      isGrade(m.engagementGrade)
     );
   });
 
@@ -112,7 +143,11 @@ function parseCreateBody(
   const validWords = words.every((word) => {
     if (typeof word !== "object" || word === null) return false;
     const w = word as Record<string, unknown>;
-    return typeof w.word === "string" && typeof w.start === "number" && typeof w.end === "number";
+    return (
+      typeof w.word === "string" &&
+      typeof w.start === "number" &&
+      typeof w.end === "number"
+    );
   });
 
   if (!validWords) return null;
@@ -121,6 +156,7 @@ function parseCreateBody(
     uploadId,
     moments: moments as MomentInput[],
     words: words as CaptionWord[],
-    captionPreset: (captionPreset as CaptionPresetId | undefined) ?? DEFAULT_CAPTION_PRESET,
+    captionPreset:
+      (captionPreset as CaptionPresetId | undefined) ?? DEFAULT_CAPTION_PRESET,
   };
 }

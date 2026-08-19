@@ -96,7 +96,6 @@ commercial tools for our workflow, not just cheaper.
   /anthropic.ts             → SDK client
 /components
   /ClipReviewer.tsx         → visual editor: cut sliders, preview (client)
-  /CaptionEditor.tsx        → caption correction (client)
 ```
 
 ## Build order (build the easy path first, prove it end-to-end)
@@ -107,7 +106,8 @@ commercial tools for our workflow, not just cheaper.
   suggested moments with timestamps in the frontend. No video manipulation yet beyond reading.
 - **Phase 2:** cut route (FFmpeg) + .ass captions → produce captioned clips, still 16:9.
 - **Phase 3:** the 9:16 reframe with MediaPipe (center crop first, then face tracking).
-- **Phase 4:** the review interface (the differentiator) — cut sliders, caption editing.
+- **Phase 4:** the review interface (the differentiator) — cut sliders with a live caption-style
+  preview. No caption-text editing UI — out of scope, see constraints below.
 - **Phase 5:** title/description generation, then (later, out of campaign) YouTube API upload.
 
 Do not build 1→7 linearly. Get the easy path (1,2,3,5,6 minus the reframe) working end-to-end
@@ -119,6 +119,7 @@ it should stop with something that runs, not seven half-built pieces.
 - **Never automate TikTok/Instagram posting** while this tool feeds clipping campaigns.
   Campaigns require organic-only traffic and issue instant bans for automated/artificial
   activity. YouTube API upload is fine; TikTok/IG stay manual.
-- **Captions must be human-verifiable before export** — auto-transcription errors on names,
-  tickers, and jargon are common and hurt retention.
+- **No caption-editing UI is planned** — a dedicated correction step was considered and dropped
+  as unnecessary. Auto-transcription errors (names, tickers, jargon) are accepted as-is; if this
+  becomes a real problem later, revisit rather than silently building the editor back in.
 - **Keep the Anthropic API key server-side only** (env var, never shipped to the client).

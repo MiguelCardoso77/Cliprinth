@@ -11,7 +11,8 @@ export class AnalyzeController {
       return failure("words is required", 400);
     }
 
-    const moments = await this.service.findMoments(words);
+    const campaignRules = extractCampaignRules(body);
+    const moments = await this.service.findMoments(words, campaignRules);
     return success({ moments });
   };
 }
@@ -21,4 +22,10 @@ function extractWords(body: unknown): WhisperWord[] | null {
   const words = (body as Record<string, unknown>).words;
   if (!Array.isArray(words)) return null;
   return words as WhisperWord[];
+}
+
+function extractCampaignRules(body: unknown): string | undefined {
+  if (typeof body !== "object" || body === null) return undefined;
+  const campaignRules = (body as Record<string, unknown>).campaignRules;
+  return typeof campaignRules === "string" ? campaignRules : undefined;
 }

@@ -1,9 +1,26 @@
 "use client";
 
 import { useState } from "react";
-import { IconAdd, IconBucket, IconDockToLeft, IconDockToRight, IconFolder } from "./icons";
+import {
+  IconAdd,
+  IconBucket,
+  IconChart,
+  IconDockToLeft,
+  IconDockToRight,
+  IconFolder,
+  IconPerson,
+  IconPost,
+  IconStar,
+} from "./icons";
 
-export type Tab = "new" | "projects" | "storage";
+export type Tab =
+  | "new"
+  | "projects"
+  | "shortlist"
+  | "posts"
+  | "storage"
+  | "accounts"
+  | "analytics";
 
 export function Sidebar({ tab, onChange }: { tab: Tab; onChange: (tab: Tab) => void }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -43,6 +60,20 @@ export function Sidebar({ tab, onChange }: { tab: Tab; onChange: (tab: Tab) => v
           onClick={() => onChange("projects")}
         />
         <NavItem
+          icon={<IconStar className="h-5 w-5" />}
+          label="Shortlist"
+          active={tab === "shortlist"}
+          collapsed={collapsed}
+          onClick={() => onChange("shortlist")}
+        />
+        <NavItem
+          icon={<IconPost className="h-5 w-5" />}
+          label="Posts"
+          active={tab === "posts"}
+          collapsed={collapsed}
+          onClick={() => onChange("posts")}
+        />
+        <NavItem
           icon={<IconBucket className="h-5 w-5" />}
           label="Storage"
           active={tab === "storage"}
@@ -50,6 +81,23 @@ export function Sidebar({ tab, onChange }: { tab: Tab; onChange: (tab: Tab) => v
           onClick={() => onChange("storage")}
         />
       </nav>
+
+      <div className={`flex flex-col gap-1 border-t border-border py-2 ${collapsed ? "px-2" : "px-3"}`}>
+        <NavItem
+          icon={<IconChart className="h-5 w-5" />}
+          label="Analytics"
+          active={tab === "analytics"}
+          collapsed={collapsed}
+          onClick={() => onChange("analytics")}
+        />
+        <NavItem
+          icon={<IconPerson className="h-5 w-5" />}
+          label="Accounts"
+          active={tab === "accounts"}
+          collapsed={collapsed}
+          onClick={() => onChange("accounts")}
+        />
+      </div>
 
       <button
         type="button"

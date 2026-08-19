@@ -21,6 +21,10 @@
   --accent-active: #f04d24;
   --accent-soft: rgba(255, 90, 51, 0.14);
   --rec: #ff3b3b;
+  --pick: #22e07a;
+  --pick-hover: #4eeb96;
+  --pick-active: #17b562;
+  --pick-soft: rgba(34, 224, 122, 0.14);
 
   /* Kept for any older usages still referencing the previous names. */
   --background: var(--bg-app);
@@ -44,6 +48,10 @@
   --color-accent-active: var(--accent-active);
   --color-accent-soft: var(--accent-soft);
   --color-rec: var(--rec);
+  --color-pick: var(--pick);
+  --color-pick-hover: var(--pick-hover);
+  --color-pick-active: var(--pick-active);
+  --color-pick-soft: var(--pick-soft);
   --font-sans: var(--font-manrope);
   --font-mono: var(--font-plex-mono);
   --font-display: var(--font-space-grotesk);

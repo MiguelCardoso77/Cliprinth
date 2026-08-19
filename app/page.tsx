@@ -3,7 +3,11 @@
 import { useState } from "react";
 import { NewTab } from "@/app/web/NewTab";
 import { ProjectsTab } from "@/app/web/ProjectsTab";
+import { ShortlistTab } from "@/app/web/ShortlistTab";
+import { PostsTab } from "@/app/web/PostsTab";
 import { StorageTab } from "@/app/web/StorageTab";
+import { AccountsTab } from "@/app/web/AccountsTab";
+import { AnalyticsTab } from "@/app/web/AnalyticsTab";
 import { Sidebar, Tab } from "@/app/web/Sidebar";
 
 export default function Home() {
@@ -16,7 +20,11 @@ export default function Home() {
         <div className="mx-auto w-full max-w-[1080px]">
           {tab === "new" && <NewTab />}
           {tab === "projects" && <ProjectsTab />}
+          {tab === "shortlist" && <ShortlistTab />}
+          {tab === "posts" && <PostsTab />}
           {tab === "storage" && <StorageTab />}
+          {tab === "accounts" && <AccountsTab />}
+          {tab === "analytics" && <AnalyticsTab />}
         </div>
       </main>
     </div>

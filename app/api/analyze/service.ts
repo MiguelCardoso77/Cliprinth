@@ -1,6 +1,11 @@
 import { getAnthropicClient } from "@/lib/anthropic";
 import { WhisperWord } from "@/lib/whisper";
-import { buildMomentsPrompt, buildTimestampedTranscript, MOMENT_SCHEMA } from "@/lib/moments";
+import {
+  buildMomentsPrompt,
+  buildTimestampedTranscript,
+  Grade,
+  MOMENT_SCHEMA,
+} from "@/lib/moments";
 
 export type Moment = {
   start: number;
@@ -10,10 +15,16 @@ export type Moment = {
   description: string;
   hashtags: string[];
   viralityScore: number;
+  hookGrade: Grade;
+  flowGrade: Grade;
+  engagementGrade: Grade;
 };
 
 export class AnalyzeService {
-  public findMoments = async (words: WhisperWord[]): Promise<Moment[]> => {
+  public findMoments = async (
+    words: WhisperWord[],
+    campaignRules?: string,
+  ): Promise<Moment[]> => {
     const transcript = buildTimestampedTranscript(words);
     const client = getAnthropicClient();
 
@@ -27,7 +38,7 @@ export class AnalyzeService {
       messages: [
         {
           role: "user",
-          content: buildMomentsPrompt(transcript),
+          content: buildMomentsPrompt(transcript, campaignRules),
         },
       ],
     });
