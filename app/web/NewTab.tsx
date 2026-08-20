@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import {
   buildMomentsPrompt,
   buildTimestampedTranscript,
+  computeViralityScore,
   Grade,
 } from "@/lib/moments";
 import {
@@ -360,9 +361,19 @@ export function NewTab() {
       return;
     }
 
-    setMoments(parsedMoments);
+    const scoredMoments = parsedMoments.map((moment) => ({
+      ...moment,
+      viralityScore: computeViralityScore(
+        moment.viralityScore,
+        moment.hookGrade,
+        moment.flowGrade,
+        moment.engagementGrade,
+      ),
+    }));
+
+    setMoments(scoredMoments);
     setStatus(
-      `${parsedMoments.length} moments loaded from the pasted response. Pick a caption style below and cut the clips.`,
+      `${scoredMoments.length} moments loaded from the pasted response. Pick a caption style below and cut the clips.`,
     );
   }
 
@@ -600,6 +611,7 @@ export function NewTab() {
           <button
             type="submit"
             disabled={isBusy || !canAdvance}
+            suppressHydrationWarning
             className="w-full rounded-md px-4 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed"
             style={
               isBusy || !canAdvance

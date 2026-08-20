@@ -22,7 +22,7 @@ function formatDuration(seconds: number): string {
   return `${mins}:${secs}`;
 }
 
-export function StorageTab() {
+export function StorageTab({ active }: { active: boolean }) {
   const [uploads, setUploads] = useState<UploadEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -38,8 +38,9 @@ export function StorageTab() {
   }
 
   useEffect(() => {
+    if (!active) return;
     loadUploads();
-  }, []);
+  }, [active]);
 
   async function uploadFiles(files: File[]) {
     const videoFiles = files.filter((file) => file.type === "video/mp4");

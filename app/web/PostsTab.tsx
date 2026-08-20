@@ -17,7 +17,7 @@ function pickRandom<T>(items: T[], count: number): T[] {
   return shuffled.slice(0, count);
 }
 
-export function PostsTab() {
+export function PostsTab({ active }: { active: boolean }) {
   const [posts, setPosts] = useState<PostEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [url, setUrl] = useState("");
@@ -32,8 +32,9 @@ export function PostsTab() {
   }
 
   useEffect(() => {
+    if (!active) return;
     loadPosts();
-  }, []);
+  }, [active]);
 
   async function handleAddPost(event: React.FormEvent) {
     event.preventDefault();

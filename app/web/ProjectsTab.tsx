@@ -26,7 +26,7 @@ type Project = {
   name?: string;
 };
 
-export function ProjectsTab() {
+export function ProjectsTab({ active }: { active: boolean }) {
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -107,6 +107,7 @@ export function ProjectsTab() {
   }
 
   useEffect(() => {
+    if (!active) return;
     let cancelled = false;
 
     fetch("/api/projects")
@@ -121,7 +122,7 @@ export function ProjectsTab() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [active]);
 
   const count = projects?.length ?? 0;
 

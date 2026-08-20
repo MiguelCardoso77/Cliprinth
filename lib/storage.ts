@@ -155,10 +155,11 @@ export async function listProjects(): Promise<ProjectMeta[]> {
 }
 
 // A post is a link to a video already published on an external platform
-// (YouTube, TikTok, Instagram). Cliprinth never publishes on the user's
-// behalf (see CLAUDE.md) — this just tracks and embeds what was posted
-// manually, for a single at-a-glance view. Stored as one JSON array since
-// the list is small and doesn't need per-entry files like uploads/projects.
+// (YouTube, TikTok, Instagram), whether Cliprinth published it via a linked
+// account (see lib/accounts.ts) or the user posted it by hand — this just
+// tracks and embeds it for a single at-a-glance view. Stored as one JSON
+// array since the list is small and doesn't need per-entry files like
+// uploads/projects.
 export type PostEntry = { id: string; url: string };
 
 // Stored oldest-first (append-only); readPosts/listPosts reverse it so

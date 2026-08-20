@@ -33,6 +33,11 @@ commercial tools for our workflow, not just cheaper.
 - **Captions:** generated as .ass files (ASS format, not SRT — ASS allows per-word
   highlighting and styling for the TikTok-style karaoke captions), burned in with FFmpeg.
 - **YouTube upload:** `googleapis` npm package (official). See constraints below.
+- **TikTok upload:** TikTok Content Posting API (`video.publish` scope), OAuth-connected
+  account, app must pass TikTok's audit. Official API only — see constraints below.
+- **Instagram upload:** Meta Graph API, requires an Instagram **Business/Creator** account
+  linked to a Facebook Page, and a Meta app that has passed app review. Official API only —
+  see constraints below.
 
 ## The 7 steps of the pipeline
 
@@ -55,12 +60,18 @@ commercial tools for our workflow, not just cheaper.
    routinely mangle names and domain terms, so these are editable in the review UI.
 6. **Generate title + description** (and hashtags) via the Anthropic API from the clip's
    transcript. Editable in the review UI.
-7. **Publishing.** YouTube has an official upload API — use it, it's within platform rules.
-   TikTok and Instagram do NOT have clean publishing APIs; browser automation for them is
-   fragile AND risks violating the "organic only / instant ban" rules of the clipping
-   campaigns this tool feeds. **Keep TikTok/IG publishing MANUAL.** The app should output a
-   ready-to-post bundle (final video + title + description + hashtags in an organized folder);
-   the human posts to TikTok/IG by hand. Do not automate TikTok/IG posting.
+7. **Publishing.** Automate posting to YouTube, TikTok and Instagram — but ONLY through each
+   platform's official posting API (YouTube Data API v3, TikTok Content Posting API, Meta
+   Graph API for Instagram), with an approved app and a properly connected account (OAuth for
+   YouTube/TikTok, Business/Creator account + linked Facebook Page for Instagram). This is
+   distinct from — and does not carry the same ban risk as — browser automation, which mimics
+   human activity to fake organic engagement and is what the "organic only / instant ban"
+   campaign rules actually target. **Never fall back to browser automation / scraping /
+   unofficial endpoints for TikTok or Instagram** if the official API path is unavailable or
+   an app review is pending — leave publishing manual for that platform instead of automating
+   around it. Each platform integration needs its own OAuth connect flow, stored per-account
+   credentials, and its own upload route (mirroring the YouTube one), since the three APIs
+   have different auth models, media requirements, and rate limits.
 
 ## Architecture decisions (decided up front)
 
@@ -116,9 +127,14 @@ it should stop with something that runs, not seven half-built pieces.
 
 ## Important constraints — do not lose these in the code
 
-- **Never automate TikTok/Instagram posting** while this tool feeds clipping campaigns.
-  Campaigns require organic-only traffic and issue instant bans for automated/artificial
-  activity. YouTube API upload is fine; TikTok/IG stay manual.
+- **TikTok/Instagram posting may be automated, but ONLY via each platform's official posting
+  API** (TikTok Content Posting API, Meta Graph API), with an approved app and a properly
+  connected account. Never automate via browser automation, scraping, or unofficial/reverse-
+  engineered endpoints for TikTok or Instagram — that is the kind of automated/artificial
+  activity the "organic only / instant ban" campaign rules actually penalize, unlike posting
+  through a platform-sanctioned API. If official API access isn't available yet for a given
+  account (pending app review, non-business IG account, etc.), fall back to manual posting for
+  that platform rather than automating around the restriction.
 - **No caption-editing UI is planned** — a dedicated correction step was considered and dropped
   as unnecessary. Auto-transcription errors (names, tickers, jargon) are accepted as-is; if this
   becomes a real problem later, revisit rather than silently building the editor back in.

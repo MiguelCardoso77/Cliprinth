@@ -8,15 +8,16 @@ type VersionInfo = {
   upToDate: boolean | null;
 };
 
-export function SettingsTab() {
+export function SettingsTab({ active }: { active: boolean }) {
   const [version, setVersion] = useState<VersionInfo | null>(null);
 
   useEffect(() => {
+    if (!active) return;
     fetch("/api/version")
       .then((res) => res.json())
       .then(setVersion)
       .catch(() => setVersion(null));
-  }, []);
+  }, [active]);
 
   return (
     <div className="flex flex-col">

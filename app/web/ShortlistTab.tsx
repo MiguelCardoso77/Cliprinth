@@ -21,11 +21,12 @@ type ShortlistEntry = {
   clipFile: string;
 };
 
-export function ShortlistTab() {
+export function ShortlistTab({ active }: { active: boolean }) {
   const [entries, setEntries] = useState<ShortlistEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!active) return;
     let cancelled = false;
 
     fetch("/api/picks")
@@ -40,7 +41,7 @@ export function ShortlistTab() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [active]);
 
   if (error) {
     return (
